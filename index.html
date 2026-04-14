@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agentica Tax Preparation — Inquirex Demo</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f0eb;
+      color: #1c1917;
+      min-height: 100vh;
+    }
+
+    /* Fake host site to demonstrate embedding */
+    .site-nav {
+      background: #fff;
+      border-bottom: 1px solid #e7e5e4;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .site-logo {
+      font-weight: 700;
+      font-size: 20px;
+      color: #2563eb;
+      letter-spacing: -0.02em;
+    }
+    .site-nav a {
+      color: #78716c;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .site-nav a:hover { color: #1c1917; }
+
+    .site-hero {
+      max-width: 720px;
+      margin: 80px auto;
+      padding: 0 32px;
+    }
+    .site-hero h1 {
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+    }
+    .site-hero h1 span { color: #2563eb; }
+    .site-hero p {
+      font-size: 18px;
+      line-height: 1.6;
+      color: #57534e;
+      max-width: 560px;
+    }
+
+    .site-features {
+      max-width: 720px;
+      margin: 60px auto;
+      padding: 0 32px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .feature {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #e7e5e4;
+    }
+    .feature h3 { font-size: 16px; margin-bottom: 8px; }
+    .feature p { font-size: 14px; color: #78716c; line-height: 1.5; }
+
+    .site-footer {
+      text-align: center;
+      padding: 40px 32px;
+      font-size: 13px;
+      color: #a8a29e;
+    }
+  </style>
+</head>
+<body>
+  <!-- Simulated host site -->
+  <nav class="site-nav">
+    <div class="site-logo">Agentica</div>
+    <a href="#">Services</a>
+    <a href="#">Pricing</a>
+    <a href="#">About</a>
+    <a href="#">Contact</a>
+  </nav>
+
+  <section class="site-hero">
+    <h1>Tax preparation<br/><span>made simple.</span></h1>
+    <p>
+      Expert tax preparation for individuals and businesses.
+      Click the chat button in the bottom-right corner to get started
+      with your personalized intake questionnaire.
+    </p>
+  </section>
+
+  <section class="site-features">
+    <div class="feature">
+      <h3>Personal Returns</h3>
+      <p>W-2, 1099, investments, and more. We handle simple to complex returns.</p>
+    </div>
+    <div class="feature">
+      <h3>Business Taxes</h3>
+      <p>LLC, S-Corp, partnerships. Strategic planning to minimize your liability.</p>
+    </div>
+    <div class="feature">
+      <h3>Year-Round Support</h3>
+      <p>Not just during tax season. Planning, estimates, and audit defense.</p>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    &copy; 2025 Agentica Group. This is a demo page for the Inquirex widget.
+  </footer>
+
+  <!-- In dev: load as module and create widget manually.
+       In production: a single <script src="inquirex.js" data-flow-url="..."> auto-inits. -->
+  <script type="module">
+    import './src/widget.ts';
+    const widget = document.createElement('inquirex-widget');
+    widget.setAttribute('flow-url', '/demo/tax-intake.json');
+    document.body.appendChild(widget);
+  </script>
+</body>
+</html>

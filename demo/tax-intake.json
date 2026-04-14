@@ -1,0 +1,225 @@
+{
+  "id": "tax-intake-2025",
+  "version": "1.0.0",
+  "meta": {
+    "title": "Tax Preparation",
+    "subtitle": "Let us understand your tax situation",
+    "brand": {
+      "name": "Agentica",
+      "color": "#2563eb"
+    }
+  },
+  "start": "filing_status",
+  "steps": {
+    "filing_status": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "What is your filing status?",
+      "options": [
+        {
+          "value": "single",
+          "label": "Single"
+        },
+        {
+          "value": "married_jointly",
+          "label": "Married Filing Jointly"
+        },
+        {
+          "value": "married_separately",
+          "label": "Married Filing Separately"
+        },
+        {
+          "value": "head_of_household",
+          "label": "Head of Household"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "dependents"
+        }
+      ],
+      "widget": {
+        "desktop": {
+          "type": "radio_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "dependents": {
+      "verb": "ask",
+      "type": "integer",
+      "question": "How many dependents do you have?",
+      "default": 0,
+      "transitions": [
+        {
+          "to": "income_types"
+        }
+      ],
+      "widget": {
+        "desktop": {
+          "type": "number_input"
+        },
+        "mobile": {
+          "type": "number_input"
+        }
+      }
+    },
+    "income_types": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Select all sources of income that apply to you.",
+      "options": [
+        {
+          "value": "W-2 Employment",
+          "label": "W-2 Employment"
+        },
+        {
+          "value": "Self-Employment",
+          "label": "Self-Employment"
+        },
+        {
+          "value": "Business",
+          "label": "Business"
+        },
+        {
+          "value": "Investments",
+          "label": "Investments"
+        },
+        {
+          "value": "Rental Income",
+          "label": "Rental Income"
+        },
+        {
+          "value": "Retirement",
+          "label": "Retirement"
+        },
+        {
+          "value": "Other",
+          "label": "Other"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "business_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "Business"
+          }
+        },
+        {
+          "to": "estimated_income"
+        }
+      ],
+      "widget": {
+        "desktop": {
+          "type": "checkbox_group"
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "business_count": {
+      "verb": "ask",
+      "type": "integer",
+      "question": "How many businesses do you own or operate?",
+      "transitions": [
+        {
+          "to": "estimated_income"
+        }
+      ],
+      "widget": {
+        "desktop": {
+          "type": "number_input"
+        },
+        "mobile": {
+          "type": "number_input"
+        }
+      }
+    },
+    "estimated_income": {
+      "verb": "ask",
+      "type": "currency",
+      "question": "What is your estimated total annual income?",
+      "transitions": [
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "desktop": {
+          "type": "currency_input"
+        },
+        "mobile": {
+          "type": "currency_input"
+        }
+      }
+    },
+    "state_filing": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Which state do you file taxes in?",
+      "options": [
+        {
+          "value": "california",
+          "label": "California"
+        },
+        {
+          "value": "new_york",
+          "label": "New York"
+        },
+        {
+          "value": "texas",
+          "label": "Texas"
+        },
+        {
+          "value": "florida",
+          "label": "Florida"
+        },
+        {
+          "value": "other",
+          "label": "Other"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "additional_info"
+        }
+      ],
+      "widget": {
+        "desktop": {
+          "type": "dropdown"
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "additional_info": {
+      "verb": "ask",
+      "type": "text",
+      "question": "Anything else we should know about your tax situation?",
+      "transitions": [
+        {
+          "to": "thank_you"
+        }
+      ],
+      "widget": {
+        "desktop": {
+          "type": "textarea"
+        },
+        "mobile": {
+          "type": "textarea"
+        }
+      }
+    },
+    "thank_you": {
+      "verb": "say",
+      "text": "Thank you! We have all the information we need. A tax professional will review your answers and reach out within 24 hours."
+    }
+  }
+}
