@@ -1,6 +1,8 @@
-import { LitElement, html, css, nothing } from "lit";
+import { LitElement, html, css, nothing, type PropertyValues } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { FlowEngine } from "./engine.js";
+import { applyTheme } from "./theme.js";
 import type { FlowDefinition, StepDefinition, HistoryEntry, Option } from "./types.js";
 
 // Register sub-components (side-effect imports)
@@ -20,6 +22,8 @@ const CHAT_ICON = html`<svg width="26" height="26" viewBox="0 0 24 24" fill="non
 const CLOSE_ICON = html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 const SEND_ICON = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
 const CHECK_ICON = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+const BUG_ICON = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><line x1="12" y1="6" x2="12" y2="4"/><line x1="9.5" y1="4" x2="14.5" y2="4"/><line x1="19" y1="8" x2="16" y2="10"/><line x1="5" y1="8" x2="8" y2="10"/><line x1="19" y1="18" x2="16" y2="16"/><line x1="5" y1="18" x2="8" y2="16"/><line x1="19" y1="13" x2="16" y2="13"/><line x1="5" y1="13" x2="8" y2="13"/></svg>`;
+
 
 @customElement("inquirex-widget")
 export class InquirexWidget extends LitElement {
@@ -29,6 +33,7 @@ export class InquirexWidget extends LitElement {
     :host {
       --iq-brand: #2563eb;
       --iq-brand-dark: color-mix(in srgb, var(--iq-brand) 85%, #000);
+      --iq-on-brand: #ffffff;
       --iq-bg: #f8f7f4;
       --iq-surface: #ffffff;
       --iq-text: #1c1917;
@@ -36,6 +41,7 @@ export class InquirexWidget extends LitElement {
       --iq-border: #e7e5e4;
       --iq-radius: 18px;
       --iq-font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --iq-header-font: var(--iq-font);
 
       font-family: var(--iq-font);
       font-size: 15px;
@@ -52,7 +58,7 @@ export class InquirexWidget extends LitElement {
       width: 60px; height: 60px;
       border-radius: 50%;
       background: var(--iq-brand);
-      color: #fff;
+      color: var(--iq-on-brand);
       border: none;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
@@ -113,11 +119,29 @@ export class InquirexWidget extends LitElement {
     /* ── Header ── */
     .header {
       background: linear-gradient(135deg, var(--iq-brand), var(--iq-brand-dark));
-      color: #fff;
+      color: var(--iq-on-brand);
       padding: 20px 20px 18px;
       position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
     }
+    .header-logo {
+      flex-shrink: 0;
+      width: 60px; height: 60px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--iq-on-brand) 12%, transparent);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .header-logo img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .header-text { flex: 1; min-width: 0; padding-right: 72px; }
     .header-title {
+      font-family: var(--iq-header-font);
       font-size: 18px; font-weight: 700;
       margin: 0 0 2px;
       letter-spacing: -0.01em;
@@ -129,24 +153,110 @@ export class InquirexWidget extends LitElement {
     }
     .close-btn {
       position: absolute; top: 14px; right: 14px;
-      background: rgba(255,255,255,0.15);
-      border: none; color: #fff;
+      background: color-mix(in srgb, var(--iq-on-brand) 18%, transparent);
+      border: none; color: var(--iq-on-brand);
       width: 32px; height: 32px;
       border-radius: 8px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s;
     }
-    .close-btn:hover { background: rgba(255,255,255,0.25); }
+    .close-btn:hover { background: color-mix(in srgb, var(--iq-on-brand) 30%, transparent); }
+
+    /* ── Debug button (dev only, sits next to the X) ── */
+    .debug-btn {
+      position: absolute; top: 14px; right: 54px;
+      background: color-mix(in srgb, var(--iq-on-brand) 18%, transparent);
+      border: none; color: var(--iq-on-brand);
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .debug-btn:hover { background: color-mix(in srgb, var(--iq-on-brand) 30%, transparent); }
+    .debug-btn:active { transform: scale(0.92); }
+
+    /* ── Debug panel (dev only — Ayu Dark inspired JSON inspector) ── */
+    .debug-panel {
+      position: absolute;
+      bottom: 72px;
+      right: calc(400px + 12px);
+      width: min(60vw, 720px);
+      height: min(85dvh, 820px);
+      background: #0b0e14;
+      color: #bfbdb6;
+      border-radius: var(--iq-radius);
+      box-shadow:
+        0 20px 60px rgba(0,0,0,0.45),
+        0 8px 24px rgba(0,0,0,0.25),
+        0 0 0 1px rgba(255,255,255,0.04);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Fantasque Sans Mono', 'Cascadia Mono', Consolas, D2Coding, monospace;
+      animation: panelIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transform-origin: bottom right;
+    }
+    .debug-header {
+      padding: 14px 18px;
+      background: linear-gradient(180deg, #11151c, #0d1117);
+      border-bottom: 1px solid #1e232d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #565b66;
+      flex-shrink: 0;
+    }
+    .debug-title {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: #bfbdb6;
+      font-weight: 600;
+    }
+    .debug-title svg { color: #59c2ff; }
+    .debug-meta { color: #565b66; font-size: 10px; }
+    .debug-content {
+      flex: 1;
+      overflow: auto;
+      margin: 0;
+      padding: 18px 20px;
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre;
+      tab-size: 2;
+    }
+    .debug-content::-webkit-scrollbar { width: 10px; height: 10px; }
+    .debug-content::-webkit-scrollbar-thumb {
+      background: #1e232d; border-radius: 6px;
+      border: 2px solid #0b0e14;
+    }
+    .debug-content::-webkit-scrollbar-thumb:hover { background: #2a313d; }
+
+    /* Ayu Dark token colors — speed-highlight class names */
+    .shj-syn-var  { color: #59c2ff; }                        /* JSON keys */
+    .shj-syn-str  { color: #aad94c; }                        /* strings */
+    .shj-syn-num  { color: #d2a6ff; }                        /* numbers + null */
+    .shj-syn-bool { color: #ffad66; font-style: italic; }    /* true/false */
+    .shj-syn-oper, .shj-syn-deleted { color: #565b66; }
+    .shj-syn-cmnt { color: #565b66; font-style: italic; }
+    .debug-content code { display: block; }
+
+    /* Hide debug panel on small screens */
+    @media (max-width: 900px) {
+      .debug-panel { display: none; }
+    }
 
     /* ── Progress bar ── */
     .progress {
       height: 3px;
-      background: rgba(255,255,255,0.15);
+      background: color-mix(in srgb, var(--iq-on-brand) 18%, transparent);
     }
     .progress-fill {
       height: 100%;
-      background: rgba(255,255,255,0.7);
+      background: color-mix(in srgb, var(--iq-on-brand) 75%, transparent);
       transition: width 0.4s ease;
       border-radius: 0 2px 2px 0;
     }
@@ -178,7 +288,7 @@ export class InquirexWidget extends LitElement {
     }
     .bubble-a {
       background: var(--iq-brand);
-      color: #fff;
+      color: var(--iq-on-brand);
       padding: 10px 16px;
       border-radius: 14px 14px 4px 14px;
       font-size: 14px;
@@ -222,7 +332,7 @@ export class InquirexWidget extends LitElement {
       width: 42px; height: 42px;
       border-radius: 10px;
       background: var(--iq-brand);
-      color: #fff;
+      color: var(--iq-on-brand);
       border: none;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
@@ -241,7 +351,7 @@ export class InquirexWidget extends LitElement {
       padding: 12px;
       border-radius: 10px;
       background: var(--iq-brand);
-      color: #fff;
+      color: var(--iq-on-brand);
       border: none;
       font-family: inherit;
       font-size: 15px;
@@ -303,6 +413,8 @@ export class InquirexWidget extends LitElement {
   @state() private inputValid = false;
   @state() private submitted = false;
   @state() private pulsed = true;
+  @state() private debugOpen = false;
+  @state() private highlightedJson = "";
 
   @query(".conversation") private conversationEl!: HTMLElement;
 
@@ -324,9 +436,7 @@ export class InquirexWidget extends LitElement {
         throw new Error("Provide flow-url or flow-json attribute");
       }
       this.engine = new FlowEngine(def);
-      if (def.meta?.brand?.color) {
-        this.style.setProperty("--iq-brand", def.meta.brand.color);
-      }
+      applyTheme(this, def);
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to load flow";
     } finally {
@@ -354,11 +464,24 @@ export class InquirexWidget extends LitElement {
       ? (engine.history.length / Math.max(engine.totalSteps, 1)) * 100
       : 0;
 
+    const showDebug = import.meta.env.DEV && this.debugOpen && engine;
+
     return html`
+      ${showDebug ? this.renderDebugPanel(engine!) : nothing}
       <div class="panel" @animationend=${this.onPanelAnimEnd}>
         <div class="header">
-          <p class="header-title">${meta?.title ?? "Questionnaire"}</p>
-          ${meta?.subtitle ? html`<p class="header-subtitle">${meta.subtitle}</p>` : nothing}
+          ${meta?.brand?.logo ? html`
+            <div class="header-logo"><img src=${meta.brand.logo} alt=${meta.brand.name ?? ""}/></div>
+          ` : nothing}
+          <div class="header-text">
+            <p class="header-title">${meta?.title ?? "Questionnaire"}</p>
+            ${meta?.subtitle ? html`<p class="header-subtitle">${meta.subtitle}</p>` : nothing}
+          </div>
+          ${import.meta.env.DEV ? html`
+            <button class="debug-btn" @click=${this.toggleDebug}
+              title=${this.debugOpen ? "Hide state inspector" : "Show state inspector"}
+              aria-label="Toggle debug panel">${BUG_ICON}</button>
+          ` : nothing}
           <button class="close-btn" @click=${this.togglePanel} aria-label="Close">${CLOSE_ICON}</button>
         </div>
         <div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div>
@@ -373,6 +496,48 @@ export class InquirexWidget extends LitElement {
         <div class="footer"><a href="https://qualified.at" target="_blank" rel="noopener">Powered by Qualified.at</a></div>
       </div>
     `;
+  }
+
+  private renderDebugPanel(engine: FlowEngine) {
+    const currentStep = engine.finished ? null : engine.currentStepId;
+
+    return html`
+      <div class="debug-panel">
+        <div class="debug-header">
+          <span class="debug-title">${BUG_ICON} POST payload</span>
+          <span class="debug-meta">
+            ${currentStep ? html`current: <code>${currentStep}</code> · ` : nothing}
+            live · updates after each answer
+          </span>
+        </div>
+        <pre class="debug-content"><code class="shj-lang-json">${
+          this.highlightedJson
+            ? unsafeHTML(this.highlightedJson)
+            : "loading..."
+        }</code></pre>
+      </div>
+    `;
+  }
+
+  private toggleDebug() {
+    this.debugOpen = !this.debugOpen;
+    if (this.debugOpen) this.refreshHighlight();
+  }
+
+  /** Re-highlight the engine state. Dynamic import keeps speed-highlight
+   *  out of the production bundle entirely (Vite tree-shakes the dev branch). */
+  private async refreshHighlight() {
+    if (!import.meta.env.DEV) return;
+    if (!this.debugOpen || !this.engine) return;
+    const json = JSON.stringify(this.engine.toResult(), null, 2);
+    const { highlightText } = await import("@speed-highlight/core");
+    this.highlightedJson = await highlightText(json, "json", false);
+  }
+
+  protected updated(changed: PropertyValues) {
+    if (import.meta.env.DEV && this.debugOpen && changed.has("debugOpen")) {
+      this.refreshHighlight();
+    }
   }
 
   private renderHistory(engine: FlowEngine) {
@@ -546,6 +711,7 @@ export class InquirexWidget extends LitElement {
     this.inputValid = false;
     this.requestUpdate();
     this.updateComplete.then(() => this.scrollToBottom());
+    this.refreshHighlight();
     this.autoSubmitIfComplete();
   }
 
@@ -568,6 +734,7 @@ export class InquirexWidget extends LitElement {
     this.inputValid = false;
     this.requestUpdate();
     this.updateComplete.then(() => this.scrollToBottom());
+    this.refreshHighlight();
     this.autoSubmitIfComplete();
   }
 

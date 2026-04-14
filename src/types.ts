@@ -44,6 +44,19 @@ export interface WidgetHint {
   [key: string]: unknown;
 }
 
+/** A single per-step contribution declaration. Exactly one shape key is set. */
+export type AccumulationShape =
+  | { lookup: Record<string, number> }
+  | { per_selection: Record<string, number> }
+  | { per_unit: number }
+  | { flat: number };
+
+/** Flow-level accumulator declaration (e.g. :price, :complexity, :credit_score). */
+export interface AccumulatorDeclaration {
+  type: string;
+  default: number;
+}
+
 /** One step in the flow graph. */
 export interface StepDefinition {
   verb: Verb;
@@ -56,6 +69,34 @@ export interface StepDefinition {
   transitions?: TransitionDefinition[];
   widget?: Record<string, WidgetHint>;
   requires_server?: boolean;
+  /** Map of accumulator name -> contribution shape. */
+  accumulate?: Record<string, AccumulationShape>;
+}
+
+/** Visual theme overrides. Each field maps 1:1 to a CSS custom property
+ *  on the widget's shadow root. All fields optional. */
+export interface ThemeOverrides {
+  /** Primary accent color (bubble, buttons, answer bubbles). */
+  brand?: string;
+  /** Text/icon color shown *on top of* the brand color.
+   *  Auto-computed from brand luminance if omitted. */
+  onBrand?: string;
+  /** Panel background color. */
+  background?: string;
+  /** Message bubble & input background. */
+  surface?: string;
+  /** Primary text color. */
+  text?: string;
+  /** Secondary / dim text color. */
+  textMuted?: string;
+  /** Border color for inputs and dividers. */
+  border?: string;
+  /** Corner radius for the panel (e.g. "18px"). */
+  radius?: string;
+  /** Body font family. */
+  font?: string;
+  /** Header font family (defaults to body font). */
+  headerFont?: string;
 }
 
 /** Top-level flow definition — the JSON wire format contract. */
@@ -65,11 +106,23 @@ export interface FlowDefinition {
   meta?: {
     title?: string;
     subtitle?: string;
-    brand?: { name?: string; color?: string };
+    /** Brand identity — set colors/fonts in `theme`, not here. */
+    brand?: {
+      name?: string;
+      /** URL to a logo image. Rendered in the header, clipped to 60x60. */
+      logo?: string;
+    };
+    /** Visual theme — every key maps to a widget CSS variable. */
+    theme?: ThemeOverrides;
   };
   start: string;
+  /** Named running totals the flow accumulates into. */
+  accumulators?: Record<string, AccumulatorDeclaration>;
   steps: Record<string, StepDefinition>;
 }
+
+/** Map of accumulator name -> current numeric total. */
+export type Totals = Record<string, number>;
 
 /** Collected answers keyed by step id. */
 export type Answers = Record<string, unknown>;

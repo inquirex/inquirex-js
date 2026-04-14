@@ -1,0 +1,22 @@
+{
+  "id": "theme-test",
+  "version": "1.0.0",
+  "meta": {
+    "title": "Theme Test",
+    "subtitle": "Brand color is white — should auto-use dark text",
+    "brand": { "name": "Test", "color": "#ffffff" }
+  },
+  "start": "first",
+  "steps": {
+    "first": {
+      "verb": "ask",
+      "type": "string",
+      "question": "What's your name?",
+      "transitions": [{ "to": "done" }]
+    },
+    "done": {
+      "verb": "say",
+      "text": "Thanks!"
+    }
+  }
+}

@@ -4,6 +4,8 @@ import type {
   Answers,
   RuleDefinition,
   HistoryEntry,
+  AccumulationShape,
+  Totals,
 } from "./types.js";
 
 /**
@@ -58,6 +60,44 @@ function isCollecting(verb: string): boolean {
 }
 
 /**
+ * Computes a single accumulation's contribution from the answer.
+ * Mirrors Inquirex::Accumulation#contribution in Ruby.
+ */
+export function accumulationContribution(
+  shape: AccumulationShape,
+  answer: unknown,
+): number {
+  if (answer == null) return 0;
+
+  if ("lookup" in shape) {
+    const key = String(answer);
+    return Number(shape.lookup[key] ?? 0);
+  }
+
+  if ("per_selection" in shape) {
+    if (!Array.isArray(answer)) return 0;
+    return answer.reduce<number>(
+      (sum, sel) => sum + Number(shape.per_selection[String(sel)] ?? 0),
+      0,
+    );
+  }
+
+  if ("per_unit" in shape) {
+    const n = typeof answer === "number" ? answer : Number(answer);
+    return Number.isFinite(n) ? n * shape.per_unit : 0;
+  }
+
+  if ("flat" in shape) {
+    if (answer === false) return 0;
+    if (typeof answer === "string" && answer.length === 0) return 0;
+    if (Array.isArray(answer) && answer.length === 0) return 0;
+    return shape.flat;
+  }
+
+  return 0;
+}
+
+/**
  * Client-side flow engine. Walks the definition graph, evaluates rules,
  * and tracks collected answers + history.
  *
@@ -68,6 +108,7 @@ export class FlowEngine {
   readonly definition: FlowDefinition;
   readonly answers: Answers = {};
   readonly history: HistoryEntry[] = [];
+  readonly totals: Totals;
 
   private _currentStepId: string;
   private _finished = false;
@@ -75,7 +116,16 @@ export class FlowEngine {
   constructor(definition: FlowDefinition) {
     this.definition = definition;
     this._currentStepId = definition.start;
+    this.totals = {};
+    for (const [name, decl] of Object.entries(definition.accumulators ?? {})) {
+      this.totals[name] = Number(decl.default ?? 0);
+    }
     this.skipIfNeeded();
+  }
+
+  /** Running total for the given accumulator (e.g. "price"). Returns 0 if undeclared. */
+  total(name: string): number {
+    return this.totals[name] ?? 0;
   }
 
   get currentStepId(): string {
@@ -102,8 +152,15 @@ export class FlowEngine {
     }
 
     this.answers[this._currentStepId] = value;
+    this.applyAccumulations(step, value);
     this.history.push({ stepId: this._currentStepId, step, answer: value });
     this.advance();
+  }
+
+  private applyAccumulations(step: StepDefinition, answer: unknown): void {
+    for (const [name, shape] of Object.entries(step.accumulate ?? {})) {
+      this.totals[name] = (this.totals[name] ?? 0) + accumulationContribution(shape, answer);
+    }
   }
 
   /** Advance past a display step (no answer collected). */
@@ -171,6 +228,7 @@ export class FlowEngine {
       flow_id: this.definition.id,
       version: this.definition.version,
       answers: { ...this.answers },
+      totals: { ...this.totals },
       path_taken: this.history.map((h) => h.stepId),
       steps_completed: this.history.length,
       completed_at: new Date().toISOString(),

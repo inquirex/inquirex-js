@@ -15,7 +15,8 @@
     "rootDir": "src",
     "skipLibCheck": true,
     "useDefineForClassFields": false,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }
