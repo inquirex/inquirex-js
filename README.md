@@ -192,7 +192,39 @@ createServer((req, res) => {
 
 ## JSON Wire Format
 
-The flow definition JSON is produced by the Ruby DSL (`definition.to_json` or `definition.to_h`). Here's the structure the widget expects:
+The flow definition JSON is produced by the Ruby DSL. Define a flow, then call `to_json`:
+
+```ruby
+require "inquirex"
+
+definition = Inquirex.define id: "tax-intake-2025", version: "1.0.0" do
+  meta title: "Tax Preparation",
+       subtitle: "Let us understand your tax situation",
+       brand: { name: "Agentica", color: "#2563eb" }
+
+  start :filing_status
+
+  ask :filing_status do
+    type :enum
+    question "What is your filing status?"
+    options single: "Single", married_jointly: "Married Filing Jointly"
+    transition to: :dependents
+  end
+
+  ask :dependents do
+    type :integer
+    question "How many dependents?"
+    default 0
+    transition to: :income_types
+  end
+
+  # ... more steps ...
+end
+
+puts definition.to_json
+```
+
+That produces the following JSON, which is the structure the widget expects:
 
 ```json
 {
@@ -215,7 +247,11 @@ The flow definition JSON is produced by the Ruby DSL (`definition.to_json` or `d
       ],
       "transitions": [
         { "to": "dependents" }
-      ]
+      ],
+      "widget": {
+        "desktop": { "type": "radio_group" },
+        "mobile":  { "type": "dropdown" }
+      }
     },
     "dependents": {
       "verb": "ask",
@@ -224,10 +260,27 @@ The flow definition JSON is produced by the Ruby DSL (`definition.to_json` or `d
       "default": 0,
       "transitions": [
         { "to": "income_types" }
-      ]
+      ],
+      "widget": {
+        "desktop": { "type": "number_input" },
+        "mobile":  { "type": "number_input" }
+      }
     }
   }
 }
+```
+
+Note the `"widget"` keys -- these are auto-populated by `WidgetRegistry` defaults when no explicit `widget` hint is set in the DSL. You can override them:
+
+```ruby
+ask :filing_status do
+  type :enum
+  question "What is your filing status?"
+  options single: "Single", married_jointly: "Married Filing Jointly"
+  widget target: :desktop, type: :radio_group, columns: 2
+  widget target: :mobile,  type: :dropdown
+  transition to: :dependents
+end
 ```
 
 ### Verbs
