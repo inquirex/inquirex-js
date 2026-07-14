@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { FlowEngine, evaluateRule } from "../src/engine.js";
+import {
+  FlowEngine,
+  accumulationContribution,
+  evaluateRule,
+} from "../src/engine.js";
 import type { FlowDefinition, RuleDefinition } from "../src/types.js";
 
 const flow = (overrides: Partial<FlowDefinition> = {}): FlowDefinition => ({
@@ -213,6 +217,25 @@ describe("FlowEngine", () => {
     expect(engine.finished).toBe(true);
   });
 
+  it("marks finished when a transition points at an unknown step", () => {
+    const engine = new FlowEngine(
+      flow({
+        steps: {
+          a: {
+            verb: "ask",
+            type: "string",
+            question: "A?",
+            transitions: [{ to: "missing" }],
+          },
+        },
+      }),
+    );
+
+    engine.answer("Alice");
+
+    expect(engine.finished).toBe(true);
+  });
+
   it("follows conditional transitions with rules", () => {
     const branching = flow({
       steps: {
@@ -267,6 +290,48 @@ describe("FlowEngine", () => {
     expect(engine.currentStepId).toBe("c");
   });
 
+  it("marks finished when skip_if matches a step without a transition", () => {
+    const engine = new FlowEngine({
+      id: "skip",
+      version: "1.0.0",
+      start: "extract",
+      steps: {
+        extract: {
+          verb: "extract",
+          transitions: [{ to: "a" }],
+        },
+        a: {
+          verb: "ask",
+          type: "string",
+          question: "A?",
+          skip_if: { op: "equals", field: "prefilled", value: "yes" },
+        },
+      },
+    });
+    engine.applyExtraction({ prefilled: "yes" }, "a");
+
+    expect(engine.finished).toBe(true);
+  });
+
+  it("reports whether the current step requires a server round-trip", () => {
+    const engine = new FlowEngine(
+      flow({
+        steps: {
+          a: {
+            verb: "extract",
+            requires_server: true,
+            transitions: [{ to: "b" }],
+          },
+          b: { verb: "say", text: "Done" },
+        },
+      }),
+    );
+
+    expect(engine.currentStepRequiresServer).toBe(true);
+    engine.failExtraction();
+    expect(engine.currentStepRequiresServer).toBe(false);
+  });
+
   it("toResult produces a serializable result payload", () => {
     const engine = new FlowEngine(flow());
     engine.answer("Alice");
@@ -286,5 +351,11 @@ describe("FlowEngine", () => {
   it("totalSteps returns the count of steps", () => {
     const engine = new FlowEngine(flow());
     expect(engine.totalSteps).toBe(3);
+  });
+});
+
+describe("accumulationContribution", () => {
+  it("returns zero for an unknown contribution shape", () => {
+    expect(accumulationContribution({ bogus: 1 } as never, "answer")).toBe(0);
   });
 });

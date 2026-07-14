@@ -304,6 +304,44 @@ describe("runExtraction — the fetch round-trip", () => {
     expect(body.step).toBe("extracted");
   });
 
+  it("uses a custom DSL query parameter name for exact server verb URLs", async () => {
+    const engine = atExtractStep();
+    const { fn, calls } = jsonFetch({
+      status: "ok",
+      answers: {},
+      next: "filing_status",
+    });
+
+    await runExtraction(engine, {
+      llmUrl: "https://api.example.com/inquirex/llm",
+      dslUrl: "https://example.com/inquirex/form.json",
+      dslUrlParam: "dsl",
+      fetchFn: fn,
+    });
+
+    const url = new URL(calls[0].url);
+    expect(url.searchParams.get("dsl")).toBe(
+      "https://example.com/inquirex/form.json",
+    );
+    expect(url.searchParams.has("inquirex_dsl")).toBe(false);
+  });
+
+  it("supports relative exact server verb URLs", async () => {
+    const engine = atExtractStep();
+    const { fn, calls } = jsonFetch({
+      status: "ok",
+      answers: {},
+      next: "filing_status",
+    });
+
+    await runExtraction(engine, {
+      llmUrl: "/inquirex/llm",
+      fetchFn: fn,
+    });
+
+    expect(calls[0].url).toBe("http://localhost/inquirex/llm?verb=extract");
+  });
+
   it("omits the Authorization header when no token is set", async () => {
     const engine = atExtractStep();
     const { fn, calls } = jsonFetch({
