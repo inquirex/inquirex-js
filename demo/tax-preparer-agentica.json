@@ -1,0 +1,44 @@
+{
+  "id": "agentica-theme-demo",
+  "version": "1.0.0",
+  "meta": {
+    "title": "Agentica Group",
+    "subtitle": "Let's qualify your tax situation",
+    "brand": { "name": "Agentica" },
+    "theme": { 
+      "color": "#ff4b15",
+      "background": "#1e1e1e",
+      "surface": "#2e2e2e",
+      "text": "#c5c1b9",
+      "textMuted": "#9a9690",
+      "border": "#3a3a3a",
+      "radius": "12px",
+      "font": "'Dosis', system-ui, sans-serif",
+      "headerFont": "'Roboto Condensed', system-ui, sans-serif"
+    }
+  },
+  "start": "name",
+  "steps": {
+    "name": {
+      "verb": "ask",
+      "type": "string",
+      "question": "What should we call you?",
+      "transitions": [{ "to": "style" }]
+    },
+    "style": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Pick a style",
+      "options": [
+        { "value": "a", "label": "Minimalist" },
+        { "value": "b", "label": "Maximalist" },
+        { "value": "c", "label": "Somewhere in between" }
+      ],
+      "transitions": [{ "to": "done" }]
+    },
+    "done": {
+      "verb": "say",
+      "text": "Thanks — your taste has been noted."
+    }
+  }
+}
