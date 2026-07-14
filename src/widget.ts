@@ -2,8 +2,14 @@ import { LitElement, html, css, nothing, type PropertyValues } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { FlowEngine } from "./engine.js";
+import { runExtraction } from "./extract-client.js";
 import { applyTheme } from "./theme.js";
-import type { FlowDefinition, StepDefinition, HistoryEntry, Option } from "./types.js";
+import type {
+  FlowDefinition,
+  StepDefinition,
+  HistoryEntry,
+  Option,
+} from "./types.js";
 
 // Register sub-components (side-effect imports)
 import "./components/text-input.js";
@@ -23,7 +29,6 @@ const CLOSE_ICON = html`<svg width="20" height="20" viewBox="0 0 24 24" fill="no
 const SEND_ICON = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
 const CHECK_ICON = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 const BUG_ICON = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><line x1="12" y1="6" x2="12" y2="4"/><line x1="9.5" y1="4" x2="14.5" y2="4"/><line x1="19" y1="8" x2="16" y2="10"/><line x1="5" y1="8" x2="8" y2="10"/><line x1="19" y1="18" x2="16" y2="16"/><line x1="5" y1="18" x2="8" y2="16"/><line x1="19" y1="13" x2="16" y2="13"/><line x1="5" y1="13" x2="8" y2="13"/></svg>`;
-
 
 @customElement("inquirex-widget")
 export class InquirexWidget extends LitElement {
@@ -391,6 +396,29 @@ export class InquirexWidget extends LitElement {
     }
     .footer a:hover { text-decoration: underline; }
 
+    /* ── Extract "thinking" indicator ── */
+    .bubble-q.thinking {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--iq-text-muted);
+    }
+    .thinking-dots { display: inline-flex; gap: 4px; }
+    .thinking-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--iq-brand);
+      opacity: 0.4;
+      animation: iqThinking 1.2s infinite ease-in-out both;
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes iqThinking {
+      0%, 80%, 100% { opacity: 0.4; transform: scale(0.85); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+
     /* ── Responsive ── */
     @media (max-width: 480px) {
       :host { bottom: 12px; right: 12px; left: 12px; }
@@ -405,6 +433,12 @@ export class InquirexWidget extends LitElement {
   /** Inline JSON string (alternative to flow-url). */
   @property({ attribute: "flow-json" }) flowJson = "";
 
+  /** URL prefix for LLM server verbs. `extract` steps POST to `{prefix}/extract`.
+   *  When empty, `extract` steps degrade to the manual-form fallback. */
+  @property({ attribute: "flow-llm-prefix" }) llmPrefix = "";
+
+  /** Client timeout (ms) for an `extract` round-trip before falling back. */
+  @property({ attribute: "flow-llm-timeout", type: Number }) llmTimeout = 20000;
 
   @state() private open = false;
   @state() private engine: FlowEngine | null = null;
@@ -415,6 +449,10 @@ export class InquirexWidget extends LitElement {
   @state() private pulsed = true;
   @state() private debugOpen = false;
   @state() private highlightedJson = "";
+
+  /** Opaque server-issued session token, carried as a bearer credential on
+   *  every `extract` POST. Captured from the flow definition's `session`. */
+  private sessionToken = "";
 
   @query(".conversation") private conversationEl!: HTMLElement;
 
@@ -436,12 +474,15 @@ export class InquirexWidget extends LitElement {
         throw new Error("Provide flow-url or flow-json attribute");
       }
       this.engine = new FlowEngine(def);
+      this.sessionToken = def.session?.token ?? "";
       applyTheme(this, def);
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to load flow";
     } finally {
       this.loading = false;
     }
+    // The flow may open directly on a server step.
+    await this.maybeRunExtraction();
   }
 
   render() {
@@ -467,21 +508,29 @@ export class InquirexWidget extends LitElement {
     const showDebug = import.meta.env.DEV && this.debugOpen && engine;
 
     return html`
-      ${showDebug ? this.renderDebugPanel(engine!) : nothing}
+      ${engine && showDebug ? this.renderDebugPanel(engine) : nothing}
       <div class="panel" @animationend=${this.onPanelAnimEnd}>
         <div class="header">
-          ${meta?.brand?.logo ? html`
+          ${
+            meta?.brand?.logo
+              ? html`
             <div class="header-logo"><img src=${meta.brand.logo} alt=${meta.brand.name ?? ""}/></div>
-          ` : nothing}
+          `
+              : nothing
+          }
           <div class="header-text">
             <p class="header-title">${meta?.title ?? "Questionnaire"}</p>
             ${meta?.subtitle ? html`<p class="header-subtitle">${meta.subtitle}</p>` : nothing}
           </div>
-          ${import.meta.env.DEV ? html`
+          ${
+            import.meta.env.DEV
+              ? html`
             <button class="debug-btn" @click=${this.toggleDebug}
               title=${this.debugOpen ? "Hide state inspector" : "Show state inspector"}
               aria-label="Toggle debug panel">${BUG_ICON}</button>
-          ` : nothing}
+          `
+              : nothing
+          }
           <button class="close-btn" @click=${this.togglePanel} aria-label="Close">${CLOSE_ICON}</button>
         </div>
         <div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div>
@@ -511,9 +560,7 @@ export class InquirexWidget extends LitElement {
           </span>
         </div>
         <pre class="debug-content"><code class="shj-lang-json">${
-          this.highlightedJson
-            ? unsafeHTML(this.highlightedJson)
-            : "loading..."
+          this.highlightedJson ? unsafeHTML(this.highlightedJson) : "loading..."
         }</code></pre>
       </div>
     `;
@@ -574,19 +621,32 @@ export class InquirexWidget extends LitElement {
 
   private renderCurrentQuestion(engine: FlowEngine) {
     const step = engine.currentStep;
+
+    // Server-processing step: no input control — show a thinking indicator
+    // while the widget round-trips (or advances past it on fallback).
+    if (engine.currentStepIsExtract) {
+      return this.renderThinking(step);
+    }
+
     const questionText = step.question ?? step.text ?? "";
     const verbClass = `msg-${step.verb}`;
 
-    const isDisplay = step.verb === "say" || step.verb === "header" || step.verb === "btw" || step.verb === "warning";
+    const isDisplay =
+      step.verb === "say" ||
+      step.verb === "header" ||
+      step.verb === "btw" ||
+      step.verb === "warning";
 
     return html`
       <div class="msg msg-q ${verbClass}">
         <div class="bubble-q">${questionText}</div>
       </div>
       <div class="input-area">
-        ${isDisplay
-          ? html`<button class="continue-btn" @click=${this.handleContinue}>Continue</button>`
-          : this.renderInputControl(step)}
+        ${
+          isDisplay
+            ? html`<button class="continue-btn" @click=${this.handleContinue}>Continue</button>`
+            : this.renderInputControl(step)
+        }
       </div>
     `;
   }
@@ -605,7 +665,9 @@ export class InquirexWidget extends LitElement {
         return html`
           <iq-multi-enum
             .options=${step.options ?? []}
-            @iq-input=${() => { this.inputValid = true; }}
+            @iq-input=${() => {
+              this.inputValid = true;
+            }}
           ></iq-multi-enum>
           <button
             class="continue-btn"
@@ -629,7 +691,9 @@ export class InquirexWidget extends LitElement {
               type=${type}
               .value=${step.default != null ? Number(step.default) : null}
               @iq-submit=${this.handleSubmitInput}
-              @iq-input=${() => { this.inputValid = true; }}
+              @iq-input=${() => {
+                this.inputValid = true;
+              }}
             ></iq-number-input>
             <button class="submit-btn" @click=${this.handleSubmitInput}>${SEND_ICON}</button>
           </div>
@@ -639,7 +703,9 @@ export class InquirexWidget extends LitElement {
         return html`
           <iq-text-input
             type="text"
-            @iq-input=${() => { this.inputValid = true; }}
+            @iq-input=${() => {
+              this.inputValid = true;
+            }}
           ></iq-text-input>
           <button
             class="continue-btn"
@@ -654,12 +720,26 @@ export class InquirexWidget extends LitElement {
             <iq-text-input
               type=${type ?? "string"}
               @iq-submit=${this.handleSubmitInput}
-              @iq-input=${() => { this.inputValid = true; }}
+              @iq-input=${() => {
+                this.inputValid = true;
+              }}
             ></iq-text-input>
             <button class="submit-btn" @click=${this.handleSubmitInput}>${SEND_ICON}</button>
           </div>
         `;
     }
+  }
+
+  private renderThinking(step: StepDefinition) {
+    const label = step.thinking_label ?? "Thinking…";
+    return html`
+      <div class="msg msg-q msg-extract">
+        <div class="bubble-q thinking">
+          <span class="thinking-dots"><span></span><span></span><span></span></span>
+          ${label}
+        </div>
+      </div>
+    `;
   }
 
   private renderComplete() {
@@ -706,16 +786,14 @@ export class InquirexWidget extends LitElement {
     if (e.animationName === "panelOut") this.open = false;
   }
 
-  private handleContinue() {
+  private async handleContinue() {
     this.engine?.acknowledge();
-    this.inputValid = false;
-    this.requestUpdate();
-    this.updateComplete.then(() => this.scrollToBottom());
-    this.refreshHighlight();
+    this.afterAdvance();
+    await this.maybeRunExtraction();
     this.autoSubmitIfComplete();
   }
 
-  private handleSubmitInput() {
+  private async handleSubmitInput() {
     const engine = this.engine;
     if (!engine) return;
 
@@ -731,11 +809,38 @@ export class InquirexWidget extends LitElement {
     if (Array.isArray(value) && value.length === 0) return;
 
     engine.answer(value);
+    this.afterAdvance();
+    await this.maybeRunExtraction();
+    this.autoSubmitIfComplete();
+  }
+
+  /** Shared UI refresh after the engine advances a step. */
+  private afterAdvance() {
     this.inputValid = false;
     this.requestUpdate();
     this.updateComplete.then(() => this.scrollToBottom());
     this.refreshHighlight();
-    this.autoSubmitIfComplete();
+  }
+
+  /**
+   * Drive the `extract` round-trip whenever the engine lands on a server step,
+   * chaining through consecutive `extract` steps. All fetch/fallback logic lives
+   * in {@link runExtraction} (DOM-free, unit-tested); this method owns only the
+   * spinner refresh between hops. The widget never sees or sends a prompt.
+   */
+  private async maybeRunExtraction(): Promise<void> {
+    const engine = this.engine;
+    if (!engine) return;
+
+    while (!engine.finished && engine.currentStepIsExtract) {
+      this.afterAdvance(); // show the thinking spinner
+      await runExtraction(engine, {
+        llmPrefix: this.llmPrefix,
+        sessionToken: this.sessionToken,
+        timeoutMs: this.llmTimeout,
+      });
+      this.afterAdvance(); // reflect the merged result / fallback
+    }
   }
 
   private extractValue(step: StepDefinition): unknown {
@@ -745,17 +850,31 @@ export class InquirexWidget extends LitElement {
 
     switch (type) {
       case "enum":
-        return shadow.querySelector<IqEnumSelect>("iq-enum-select")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqEnumSelect>("iq-enum-select")?.getValue() ??
+          null
+        );
       case "multi_enum":
-        return shadow.querySelector<IqMultiEnum>("iq-multi-enum")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqMultiEnum>("iq-multi-enum")?.getValue() ?? null
+        );
       case "boolean":
-        return shadow.querySelector<IqBooleanInput>("iq-boolean-input")?.getValue() ?? null;
+        return (
+          shadow
+            .querySelector<IqBooleanInput>("iq-boolean-input")
+            ?.getValue() ?? null
+        );
       case "integer":
       case "decimal":
       case "currency":
-        return shadow.querySelector<IqNumberInput>("iq-number-input")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqNumberInput>("iq-number-input")?.getValue() ??
+          null
+        );
       default:
-        return shadow.querySelector<IqTextInput>("iq-text-input")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqTextInput>("iq-text-input")?.getValue() ?? null
+        );
     }
   }
 
@@ -815,13 +934,18 @@ function autoInit() {
   const flowUrl = script.getAttribute("data-flow-url");
   const flowJson = script.getAttribute("data-flow-json");
   const siteId = script.getAttribute("data-site-id");
+  const llmPrefix = script.getAttribute("data-flow-llm-prefix");
+  const llmTimeout = script.getAttribute("data-flow-llm-timeout");
 
   if (!flowUrl && !flowJson && !siteId) return;
 
   const widget = document.createElement("inquirex-widget");
   if (flowUrl) widget.setAttribute("flow-url", flowUrl);
-  else if (siteId) widget.setAttribute("flow-url", `https://qualified.at/api/flows/${siteId}`);
+  else if (siteId)
+    widget.setAttribute("flow-url", `https://qualified.at/api/flows/${siteId}`);
   if (flowJson) widget.setAttribute("flow-json", flowJson);
+  if (llmPrefix) widget.setAttribute("flow-llm-prefix", llmPrefix);
+  if (llmTimeout) widget.setAttribute("flow-llm-timeout", llmTimeout);
   document.body.appendChild(widget);
 }
 
@@ -832,5 +956,7 @@ if (document.readyState === "loading") {
 }
 
 declare global {
-  interface HTMLElementTagNameMap { "inquirex-widget": InquirexWidget; }
+  interface HTMLElementTagNameMap {
+    "inquirex-widget": InquirexWidget;
+  }
 }

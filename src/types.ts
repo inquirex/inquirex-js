@@ -12,8 +12,19 @@ export type DataType =
   | "email"
   | "phone";
 
-/** Display verbs produce no user input; collecting verbs do. */
-export type Verb = "ask" | "confirm" | "say" | "header" | "btw" | "warning";
+/** Display verbs produce no user input; collecting verbs do.
+ *  `extract` (alias `clarify`) is a server-processing verb: it collects no
+ *  input directly — the widget round-trips to the server, which returns
+ *  structured answers that pre-fill (and thereby skip) later steps. */
+export type Verb =
+  | "ask"
+  | "confirm"
+  | "say"
+  | "header"
+  | "btw"
+  | "warning"
+  | "extract"
+  | "clarify";
 
 /** A single option in an enum / multi_enum step. */
 export interface Option {
@@ -69,6 +80,9 @@ export interface StepDefinition {
   transitions?: TransitionDefinition[];
   widget?: Record<string, WidgetHint>;
   requires_server?: boolean;
+  /** Spinner label shown while an `extract` step round-trips to the server.
+   *  The only piece of the server-side `llm` block the client ever sees. */
+  thinking_label?: string;
   /** Map of accumulator name -> contribution shape. */
   accumulate?: Record<string, AccumulationShape>;
 }
@@ -116,9 +130,26 @@ export interface FlowDefinition {
     theme?: ThemeOverrides;
   };
   start: string;
+  /** Server-issued session for authenticating `extract` round-trips.
+   *  The widget carries `token` as a bearer credential; it never signs. */
+  session?: {
+    token: string;
+    expires_at?: string;
+    budget?: number;
+  };
   /** Named running totals the flow accumulates into. */
   accumulators?: Record<string, AccumulatorDeclaration>;
   steps: Record<string, StepDefinition>;
+}
+
+/** Shape of a `POST {llm-prefix}/extract` response. Every field is optional so
+ *  that a malformed or errored response degrades to the manual-form fallback. */
+export interface ExtractResponse {
+  step?: string;
+  status?: "ok" | "partial" | "error";
+  answers?: Answers;
+  next?: string | null;
+  meta?: Record<string, unknown>;
 }
 
 /** Map of accumulator name -> current numeric total. */
