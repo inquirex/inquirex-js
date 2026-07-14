@@ -1,8 +1,8 @@
 # inquirex-js
 
-Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/flowengine-rb/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs collected answers back to the same URL.
+Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/flowengine-rb/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs the collected answers back to your server.
 
-**49KB** single-file bundle (14KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles completely.
+**53KB** single-file bundle (16KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles completely.
 
 ## Quick Start
 
@@ -10,18 +10,22 @@ Add one script tag to any page:
 
 ```html
 <script src="https://qualified.at/inquirex.js"
-        data-flow-url="https://your-server.com/api/flows/tax-intake"
-        data-flow-llm-prefix="https://your-server.com/api/llm"></script>
+        data-inquirex-url="https://your-server.com/api/flows/tax-intake"
+        data-inquirex-llm-url="https://your-server.com/api/llm"></script>
 ```
 
 That's it. A chat bubble appears in the bottom-right corner. Clicking it opens the questionnaire panel.
 
-- **`data-flow-url`** — the widget `GET`s the flow definition here and `POST`s the
-  final answers back to the same URL.
-- **`data-flow-llm-prefix`** — optional. Where `extract` steps round-trip
-  mid-flow: the widget `POST`s to `{prefix}/extract` and gets back structured
-  answers that pre-fill (and skip) later questions. Omit it and `extract` steps
-  degrade to a plain form.
+- **`data-inquirex-url`** — the widget `GET`s the flow definition here and `POST`s
+  the final answers back to the same URL (set `data-inquirex-submit-to` to split
+  the answers POST onto its own endpoint).
+- **`data-inquirex-llm-url`** — optional. The single endpoint where LLM verbs
+  round-trip mid-flow: the widget `POST`s to `{llm-url}?verb=extract&dsl=…` and
+  gets back structured answers that pre-fill (and skip) later questions. Omit it
+  and `extract` steps degrade to a plain form.
+
+Full configuration — the `mount()` API, launch/position, theming, auth, and the
+baked per-form bundle — is in **[docs/embedding.md](docs/embedding.md)**.
 
 The widget sends only **data** — flow id, step id, answers-so-far, and a bearer
 session token. Prompts, models, and schemas stay server-side. See
@@ -30,7 +34,7 @@ and the anti-spoofing design.
 
 ## How It Works
 
-The `data-flow-url` attribute points to **your server**. The widget uses that single URL for both directions, distinguished by HTTP method:
+The `data-inquirex-url` attribute points to **your server**. By default the widget uses that single URL for both directions, distinguished by HTTP method (add `data-inquirex-submit-to` to POST answers elsewhere):
 
 | Method | Purpose | Content-Type |
 |--------|---------|-------------|
@@ -83,26 +87,43 @@ If the flow declares [accumulators](#accumulators) (e.g. a `:price` running tota
 
 | Attribute | Description |
 |-----------|-------------|
-| `data-flow-url` | URL for GET (fetch flow) and POST (submit answers) |
-| `data-site-id` | Shorthand — expands to `https://qualified.at/api/flows/{site-id}` |
-| `data-flow-json` | Inline JSON string (no GET request; POST still uses `data-flow-url` if set) |
-| `data-flow-llm-prefix` | URL prefix for `extract` round-trips (`POST {prefix}/extract`). Omit to disable LLM steps |
-| `data-flow-llm-timeout` | Client timeout in ms for an `extract` call before falling back (default `20000`) |
+| `data-inquirex-url` | GET the flow DSL JSON. Also the POST target for answers unless `submit-to` is set. Forwarded to LLM verbs as `?dsl=` |
+| `data-inquirex-site-id` | Shorthand — expands to `https://qualified.at/api/flows/{site-id}` |
+| `data-inquirex-json` | Inline JSON string (no GET request) |
+| `data-inquirex-submit-to` | POST completed answers here. Defaults to `data-inquirex-url` |
+| `data-inquirex-llm-url` | POST endpoint for LLM verbs (`{llm-url}?verb=extract&dsl=…`). Omit to disable LLM steps |
+| `data-inquirex-llm-timeout` | Client timeout in ms for one LLM call before falling back (default `20000`) |
+| `data-inquirex-auth` | Server-signed bearer token forwarded on every request |
+| `data-inquirex-trigger` | `click` \| `auto` \| `delay` (default `click`) |
+| `data-inquirex-trigger-delay` | ms before auto-open when `trigger="delay"` (default `1000`) |
+| `data-inquirex-position` | `bottom-right` \| `bottom-left` (default `bottom-right`) |
+| `data-inquirex-theme` | JSON object of [theme overrides](docs/embedding.md#theming) |
 
-Priority: `data-flow-json` (for the definition) > `data-flow-url` > `data-site-id`.
+Priority for the definition: `json` > `url` > `site-id`. Full configuration
+surface, precedence rules, the `mount()` API, the baked per-form bundle, theming,
+and auth are documented in **[docs/embedding.md](docs/embedding.md)**.
 
 ### Programmatic Usage
 
-You can also create the widget element directly:
+Install from npm and `mount()` the widget:
+
+```ts
+import { mount } from 'inquirex-js';
+
+mount({
+  url: '/api/flows/my-flow',
+  llmUrl: '/api/flows/my-flow/llm',
+  position: 'bottom-left',
+  theme: { headerBg: '#111827', highlight: '#f59e0b', radius: '0' },
+});
+```
+
+Or write the custom element by hand (attribute names drop the `data-inquirex-`
+prefix):
 
 ```html
-<script type="module">
-  import 'https://qualified.at/inquirex.js';
-
-  const widget = document.createElement('inquirex-widget');
-  widget.setAttribute('flow-url', '/api/flows/my-flow');
-  document.body.appendChild(widget);
-</script>
+<inquirex-widget url="/api/flows/my-flow" llm-url="/api/flows/my-flow/llm">
+</inquirex-widget>
 ```
 
 ## CORS Setup

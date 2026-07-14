@@ -75,26 +75,36 @@ ever sees — a display string for the spinner. Everything else stays server-sid
 
 ## The round-trip
 
-### Request — `POST {llm-prefix}/extract`
+### Request — `POST {llmUrl}?verb=extract&dsl={dslUrl}`
 
-`{llm-prefix}` comes from the `data-flow-llm-prefix` script attribute.
+`{llmUrl}` is the single LLM endpoint from the `data-inquirex-llm-url` script
+attribute (config key `llmUrl`). One endpoint serves **every** server verb —
+the widget appends the verb (and the DSL source URL) as query params so the
+server can route by `verb` and reload its own authoritative definition from
+`dsl` without parsing the body. The bearer token is forwarded from
+`data-inquirex-auth` (or the flow's `session.token`).
 
 ```http
-POST https://api.qualified.at/llm/extract
+POST https://api.qualified.at/llm?verb=extract&dsl=https%3A%2F%2Fapi.qualified.at%2Fflows%2Ftax-intake
 Content-Type: application/json
+Authorization: Bearer <opaque signed token>
 ```
 
 ```json
 {
+  "verb": "extract",
   "flow_id": "tax-preparer-llm-2025",
   "version": "1.0.0",
   "step": "extracted",
-  "session_token": "<opaque signed token>",
   "answers": {
     "describe": "We're married, two kids. I have a W-2, my wife freelances (1099), and we sold some stock. California."
   }
 }
 ```
+
+- `verb` appears both as a query param (for routing) and in the body (source of
+  truth). `extract` (alias `clarify`) is the only verb in v1; future verbs
+  (`describe`, `summarize`, `detour`) reuse this endpoint with a different value.
 
 - The client sends **all answers collected so far**; the server selects the
   relevant ones via its own `from_steps`. The client never learns `from_steps`.
@@ -204,9 +214,9 @@ with no pre-filled answers":
 
 1. On reaching a step whose verb is `extract` (or `clarify`), render the
    `thinking_label` spinner bubble.
-1. POST the request above to `{data-flow-llm-prefix}/extract`.
+1. POST the request above to `{data-inquirex-llm-url}?verb=extract&dsl={url}`.
 1. Apply a client timeout (default **20 s**, configurable via
-   `data-flow-llm-timeout`). Timeout → fallback path.
+   `data-inquirex-llm-timeout`). Timeout → fallback path.
 1. On success, merge `answers` and advance to `next`.
 1. On any failure, advance to the first transition target, merging nothing.
 1. The widget never sees, sends, or stores a prompt.
@@ -261,15 +271,17 @@ fails, the same flow simply asks all five — no error, no dead end.
 
 ```html
 <script src="https://qualified.at/inquirex.js"
-        data-flow-url="https://api.qualified.at/flows/tax-intake"
-        data-flow-llm-prefix="https://api.qualified.at/llm"></script>
+        data-inquirex-url="https://api.qualified.at/flows/tax-intake"
+        data-inquirex-llm-url="https://api.qualified.at/llm"></script>
 ```
 
-`data-flow-url` handles `GET` (definition, including the session token) and the
-final `POST` (answers). `data-flow-llm-prefix` handles the mid-flow
-`POST /extract`. If `data-flow-llm-prefix` is absent, the widget treats every
-`extract` step as an immediate fallback (advance, merge nothing) — the flow still
-works as a plain form.
+`data-inquirex-url` handles `GET` (definition, including the session token) and
+the final `POST` (answers) — unless `data-inquirex-submit-to` splits the POST
+onto its own endpoint. `data-inquirex-llm-url` handles the mid-flow
+`POST ?verb=extract`. If `data-inquirex-llm-url` is absent, the widget treats
+every `extract` step as an immediate fallback (advance, merge nothing) — the flow
+still works as a plain form. See [embedding.md](./embedding.md) for the full
+config surface (auth, theme, launch, position).
 
 ## Candidate verbs (v1.1 / v2)
 
