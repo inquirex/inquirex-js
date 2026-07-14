@@ -74,7 +74,9 @@ export class IqEnumSelect extends LitElement {
     `;
   }
 
-  getValue(): string | null { return this.selected; }
+  getValue(): string | null {
+    return this.selected;
+  }
 
   private select(value: string) {
     this.selected = value;
@@ -85,5 +87,7 @@ export class IqEnumSelect extends LitElement {
 }
 
 declare global {
-  interface HTMLElementTagNameMap { "iq-enum-select": IqEnumSelect; }
+  interface HTMLElementTagNameMap {
+    "iq-enum-select": IqEnumSelect;
+  }
 }

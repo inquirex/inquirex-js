@@ -76,7 +76,9 @@ export class IqMultiEnum extends LitElement {
     `;
   }
 
-  getValue(): string[] { return [...this.selected]; }
+  getValue(): string[] {
+    return [...this.selected];
+  }
 
   private toggle(value: string) {
     const next = new Set(this.selected);
@@ -88,5 +90,7 @@ export class IqMultiEnum extends LitElement {
 }
 
 declare global {
-  interface HTMLElementTagNameMap { "iq-multi-enum": IqMultiEnum; }
+  interface HTMLElementTagNameMap {
+    "iq-multi-enum": IqMultiEnum;
+  }
 }

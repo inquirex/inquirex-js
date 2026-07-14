@@ -7,8 +7,18 @@ const flow = (overrides: Partial<FlowDefinition> = {}): FlowDefinition => ({
   version: "1.0.0",
   start: "a",
   steps: {
-    a: { verb: "ask", type: "string", question: "A?", transitions: [{ to: "b" }] },
-    b: { verb: "ask", type: "integer", question: "B?", transitions: [{ to: "c" }] },
+    a: {
+      verb: "ask",
+      type: "string",
+      question: "A?",
+      transitions: [{ to: "b" }],
+    },
+    b: {
+      verb: "ask",
+      type: "integer",
+      question: "B?",
+      transitions: [{ to: "c" }],
+    },
     c: { verb: "say", text: "Done" },
   },
   ...overrides,
@@ -24,52 +34,84 @@ describe("evaluateRule", () => {
   };
 
   it("equals: true when field matches", () => {
-    expect(evaluateRule({ op: "equals", field: "name", value: "Alice" }, answers)).toBe(true);
+    expect(
+      evaluateRule({ op: "equals", field: "name", value: "Alice" }, answers),
+    ).toBe(true);
   });
 
   it("equals: false when field differs", () => {
-    expect(evaluateRule({ op: "equals", field: "name", value: "Bob" }, answers)).toBe(false);
+    expect(
+      evaluateRule({ op: "equals", field: "name", value: "Bob" }, answers),
+    ).toBe(false);
   });
 
   it("contains: true for array membership", () => {
-    expect(evaluateRule({ op: "contains", field: "tags", value: "red" }, answers)).toBe(true);
+    expect(
+      evaluateRule({ op: "contains", field: "tags", value: "red" }, answers),
+    ).toBe(true);
   });
 
   it("contains: false for missing array element", () => {
-    expect(evaluateRule({ op: "contains", field: "tags", value: "green" }, answers)).toBe(false);
+    expect(
+      evaluateRule({ op: "contains", field: "tags", value: "green" }, answers),
+    ).toBe(false);
   });
 
   it("contains: works on strings too", () => {
-    expect(evaluateRule({ op: "contains", field: "name", value: "lic" }, answers)).toBe(true);
+    expect(
+      evaluateRule({ op: "contains", field: "name", value: "lic" }, answers),
+    ).toBe(true);
   });
 
   it("contains: false for non-array, non-string field", () => {
-    expect(evaluateRule({ op: "contains", field: "age", value: 30 }, answers)).toBe(false);
+    expect(
+      evaluateRule({ op: "contains", field: "age", value: 30 }, answers),
+    ).toBe(false);
   });
 
   it("greater_than: true when numerically greater", () => {
-    expect(evaluateRule({ op: "greater_than", field: "age", value: 18 }, answers)).toBe(true);
+    expect(
+      evaluateRule({ op: "greater_than", field: "age", value: 18 }, answers),
+    ).toBe(true);
   });
 
   it("greater_than: false when equal or less", () => {
-    expect(evaluateRule({ op: "greater_than", field: "age", value: 30 }, answers)).toBe(false);
-    expect(evaluateRule({ op: "greater_than", field: "age", value: 50 }, answers)).toBe(false);
+    expect(
+      evaluateRule({ op: "greater_than", field: "age", value: 30 }, answers),
+    ).toBe(false);
+    expect(
+      evaluateRule({ op: "greater_than", field: "age", value: 50 }, answers),
+    ).toBe(false);
   });
 
   it("less_than: true when numerically less", () => {
-    expect(evaluateRule({ op: "less_than", field: "age", value: 50 }, answers)).toBe(true);
+    expect(
+      evaluateRule({ op: "less_than", field: "age", value: 50 }, answers),
+    ).toBe(true);
   });
 
   it("not_empty: false for null, empty string, empty array", () => {
-    expect(evaluateRule({ op: "not_empty", field: "nothing" }, answers)).toBe(false);
-    expect(evaluateRule({ op: "not_empty", field: "empty" }, answers)).toBe(false);
-    expect(evaluateRule({ op: "not_empty", field: "missing" }, answers)).toBe(false);
-    expect(evaluateRule({ op: "not_empty", field: "emptyArr" }, { emptyArr: [] })).toBe(false);
+    expect(evaluateRule({ op: "not_empty", field: "nothing" }, answers)).toBe(
+      false,
+    );
+    expect(evaluateRule({ op: "not_empty", field: "empty" }, answers)).toBe(
+      false,
+    );
+    expect(evaluateRule({ op: "not_empty", field: "missing" }, answers)).toBe(
+      false,
+    );
+    expect(
+      evaluateRule({ op: "not_empty", field: "emptyArr" }, { emptyArr: [] }),
+    ).toBe(false);
   });
 
   it("not_empty: true for real values", () => {
-    expect(evaluateRule({ op: "not_empty", field: "name" }, answers)).toBe(true);
-    expect(evaluateRule({ op: "not_empty", field: "tags" }, answers)).toBe(true);
+    expect(evaluateRule({ op: "not_empty", field: "name" }, answers)).toBe(
+      true,
+    );
+    expect(evaluateRule({ op: "not_empty", field: "tags" }, answers)).toBe(
+      true,
+    );
     expect(evaluateRule({ op: "not_empty", field: "age" }, answers)).toBe(true);
   });
 
@@ -175,9 +217,14 @@ describe("FlowEngine", () => {
     const branching = flow({
       steps: {
         a: {
-          verb: "ask", type: "enum", question: "?",
+          verb: "ask",
+          type: "enum",
+          question: "?",
           transitions: [
-            { to: "yes_branch", rule: { op: "equals", field: "a", value: "yes" } },
+            {
+              to: "yes_branch",
+              rule: { op: "equals", field: "a", value: "yes" },
+            },
             { to: "no_branch" },
           ],
         },
@@ -198,9 +245,16 @@ describe("FlowEngine", () => {
     const withSkip = flow({
       start: "a",
       steps: {
-        a: { verb: "ask", type: "string", question: "Name?", transitions: [{ to: "b" }] },
+        a: {
+          verb: "ask",
+          type: "string",
+          question: "Name?",
+          transitions: [{ to: "b" }],
+        },
         b: {
-          verb: "ask", type: "integer", question: "Age?",
+          verb: "ask",
+          type: "integer",
+          question: "Age?",
           skip_if: { op: "equals", field: "a", value: "skip-me" },
           transitions: [{ to: "c" }],
         },

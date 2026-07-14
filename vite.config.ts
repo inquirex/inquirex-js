@@ -1,13 +1,17 @@
 import { defineConfig } from "vite";
-import { resolve } from "path";
+import { resolve } from "node:path";
 
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, "src/widget.ts"),
+      // The barrel registers <inquirex-widget> and re-exports the public API.
+      entry: resolve(__dirname, "src/index.ts"),
       name: "Inquirex",
-      fileName: () => "inquirex.js",
-      formats: ["iife"],
+      // inquirex.js  -> IIFE for <script src> embedding (CDN, unpkg, jsdelivr)
+      // inquirex.mjs -> ESM for `import { FlowEngine } from "inquirex-js"`
+      fileName: (format) =>
+        format === "iife" ? "inquirex.js" : "inquirex.mjs",
+      formats: ["iife", "es"],
     },
     rollupOptions: {
       output: { inlineDynamicImports: true },
