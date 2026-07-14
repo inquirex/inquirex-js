@@ -10,11 +10,23 @@ Add one script tag to any page:
 
 ```html
 <script src="https://qualified.at/inquirex.js"
-        data-flow-url="https://your-server.com/api/flows/tax-intake">
-</script>
+        data-flow-url="https://your-server.com/api/flows/tax-intake"
+        data-flow-llm-prefix="https://your-server.com/api/llm"></script>
 ```
 
 That's it. A chat bubble appears in the bottom-right corner. Clicking it opens the questionnaire panel.
+
+- **`data-flow-url`** — the widget `GET`s the flow definition here and `POST`s the
+  final answers back to the same URL.
+- **`data-flow-llm-prefix`** — optional. Where `extract` steps round-trip
+  mid-flow: the widget `POST`s to `{prefix}/extract` and gets back structured
+  answers that pre-fill (and skip) later questions. Omit it and `extract` steps
+  degrade to a plain form.
+
+The widget sends only **data** — flow id, step id, answers-so-far, and a bearer
+session token. Prompts, models, and schemas stay server-side. See
+[docs/extract-protocol.md](docs/extract-protocol.md) for the full wire contract
+and the anti-spoofing design.
 
 ## How It Works
 
@@ -29,7 +41,7 @@ The `data-flow-url` attribute points to **your server**. The widget uses that si
 
 When the widget loads, it makes a `GET` request to your URL and expects a JSON response matching the [Inquirex wire format](#json-wire-format). In Ruby, this is what `definition.to_json` produces.
 
-### POST — Receive Completed Answers
+### End of the Form: POST — Receive Completed Answers
 
 When the user finishes the questionnaire, the widget POSTs a JSON body:
 
@@ -74,6 +86,8 @@ If the flow declares [accumulators](#accumulators) (e.g. a `:price` running tota
 | `data-flow-url` | URL for GET (fetch flow) and POST (submit answers) |
 | `data-site-id` | Shorthand — expands to `https://qualified.at/api/flows/{site-id}` |
 | `data-flow-json` | Inline JSON string (no GET request; POST still uses `data-flow-url` if set) |
+| `data-flow-llm-prefix` | URL prefix for `extract` round-trips (`POST {prefix}/extract`). Omit to disable LLM steps |
+| `data-flow-llm-timeout` | Client timeout in ms for an `extract` call before falling back (default `20000`) |
 
 Priority: `data-flow-json` (for the definition) > `data-flow-url` > `data-site-id`.
 
@@ -338,7 +352,7 @@ Available operators: `equals`, `contains`, `greater_than`, `less_than`, `not_emp
 
 ### Server-Required Steps
 
-Steps marked `"requires_server": true` on their transitions will round-trip to the server for evaluation (used by `inquirex-llm` verbs like `clarify` and `summarize`). Pure rule-based branching is evaluated entirely client-side with no network calls.
+Steps marked `"requires_server": true` round-trip to the server. In v1 this is the `extract` verb (alias `clarify`), which turns a free-text answer into structured fields that pre-fill later questions — see [docs/extract-protocol.md](docs/extract-protocol.md). Pure rule-based branching is evaluated entirely client-side with no network calls.
 
 ## Accumulators
 
@@ -351,7 +365,7 @@ Like rules, accumulator contributions are **pure data**. The widget evaluates th
 A flow that uses accumulators adds two things to its JSON:
 
 1. A top-level `accumulators` map declaring each running total.
-2. An `accumulate` block on individual steps describing how each answer contributes.
+1. An `accumulate` block on individual steps describing how each answer contributes.
 
 ```json
 {
@@ -507,10 +521,10 @@ Every key is optional — omit any and the widget default is used.
 The widget **does not load external fonts**. It ships with `Outfit` for its own chrome and assumes that whatever font you specify in `theme.font` / `theme.headerFont` is **already loaded on the embedding page** (that's the usual case — you're only overriding fonts to match your own site's typography, which you already serve). If the font you name isn't available, the widget quietly falls back through this chain:
 
 1. **Your font** (e.g. `'Cairo'`)
-2. **Your fallbacks** (e.g. `sans-serif`)
-3. **Widget's Outfit** (always loaded by the widget)
-4. **System fonts** (`-apple-system`, `BlinkMacSystemFont`)
-5. **Browser default `sans-serif`**
+1. **Your fallbacks** (e.g. `sans-serif`)
+1. **Widget's Outfit** (always loaded by the widget)
+1. **System fonts** (`-apple-system`, `BlinkMacSystemFont`)
+1. **Browser default `sans-serif`**
 
 So the widget always renders something reasonable. No external requests initiated by the widget for fonts beyond Outfit.
 
@@ -548,11 +562,17 @@ If you ever need more knobs, open an issue — we'd rather add another named tok
 
 ## Development
 
+This project uses [bun](https://bun.sh) and [just](https://github.com/casey/just). Run `just` to list all recipes.
+
 ```bash
-npm install
-npm run dev       # Vite dev server at localhost:3100
-npm run build     # Produces dist/inquirex.js (IIFE bundle)
-npm run typecheck # TypeScript validation
+just install      # bun install
+just dev          # Vite dev server at localhost:3100
+just build        # Produces dist/inquirex.js (IIFE) + inquirex.mjs (ESM) + types
+just test         # Run the vitest suite
+just lint         # Lint with Biome
+just format       # Format with Biome
+just typecheck    # TypeScript validation
+just publish      # Publish the current version to npm
 ```
 
 The `index.html` dev harness simulates a host site with the widget embedded, loading `demo/tax-intake.json` as the flow definition.
