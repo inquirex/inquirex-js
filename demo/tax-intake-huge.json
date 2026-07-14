@@ -1,0 +1,1964 @@
+{
+  "id": "tax-preparer-2025",
+  "version": "2.0.0",
+  "meta": {
+    "title": "Tax Preparation Intake",
+    "subtitle": "Help us scope your return and quote you a fair fee"
+  },
+  "start": "intro",
+  "steps": {
+    "intro": {
+      "verb": "say",
+      "text": "Short multiple-choice scoping questions — 2 to 3 minutes.\nPlease do NOT enter any personal information: no names,\nSSN, ITIN, addresses, or account numbers. We only need\nenough to quote a fee.",
+      "transitions": [
+        {
+          "to": "residency_status"
+        }
+      ]
+    },
+    "residency_status": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Which best describes your US tax residency for 2025?",
+      "options": [
+        {
+          "value": "us_person",
+          "label": "US citizen or permanent resident"
+        },
+        {
+          "value": "resident",
+          "label": "Resident alien (substantial presence)"
+        },
+        {
+          "value": "non_resident",
+          "label": "Non-resident alien (1040-NR)"
+        },
+        {
+          "value": "dual_status",
+          "label": "Dual-status (arrived or departed this year)"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "prior_return_available"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "prior_return_available": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Do you have a copy of your most recent tax return?",
+      "options": [
+        {
+          "value": "yes_last_year",
+          "label": "Yes, last year's return"
+        },
+        {
+          "value": "yes_older",
+          "label": "Yes, but older than last year"
+        },
+        {
+          "value": "no",
+          "label": "No"
+        },
+        {
+          "value": "first_time",
+          "label": "First return — never filed before"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "filing_status"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "filing_status": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "What is your filing status for 2025?",
+      "options": [
+        {
+          "value": "single",
+          "label": "Single"
+        },
+        {
+          "value": "married_filing_jointly",
+          "label": "Married Filing Jointly"
+        },
+        {
+          "value": "married_filing_separately",
+          "label": "Married Filing Separately"
+        },
+        {
+          "value": "head_of_household",
+          "label": "Head of Household"
+        },
+        {
+          "value": "widowed",
+          "label": "Qualifying Widow(er)"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "dependents_band"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 1
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "dependents_band": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many dependents will you claim?",
+      "options": [
+        {
+          "value": "0",
+          "label": "0"
+        },
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2",
+          "label": "2"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "4+",
+          "label": "4+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "income_types"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 5
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "income_types": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Select every type of income you had in 2025.",
+      "options": [
+        {
+          "value": "W2",
+          "label": "W-2 wages"
+        },
+        {
+          "value": "1099_nec",
+          "label": "1099-NEC (contractor)"
+        },
+        {
+          "value": "1099_k",
+          "label": "1099-K (payment apps, marketplaces)"
+        },
+        {
+          "value": "business",
+          "label": "Business income (self-employed or entity)"
+        },
+        {
+          "value": "investment",
+          "label": "Investment income (brokerage, dividends)"
+        },
+        {
+          "value": "crypto",
+          "label": "Cryptocurrency"
+        },
+        {
+          "value": "rental",
+          "label": "Rental property"
+        },
+        {
+          "value": "retirement",
+          "label": "Retirement distributions (1099-R)"
+        },
+        {
+          "value": "social_sec",
+          "label": "Social Security"
+        },
+        {
+          "value": "gambling",
+          "label": "Gambling / lottery winnings"
+        },
+        {
+          "value": "foreign",
+          "label": "Foreign earned income"
+        },
+        {
+          "value": "home_sale",
+          "label": "Sold a home or primary residence"
+        },
+        {
+          "value": "inheritance",
+          "label": "Inheritance or large gift received"
+        },
+        {
+          "value": "none",
+          "label": "None of the above"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "w2_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "W2"
+          }
+        },
+        {
+          "to": "business_entities",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "business"
+          }
+        },
+        {
+          "to": "investment_details",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "investment"
+          }
+        },
+        {
+          "to": "crypto_volume",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "crypto"
+          }
+        },
+        {
+          "to": "rental_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "rental"
+          }
+        },
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "w2_count": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many W-2s will you report?",
+      "options": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2",
+          "label": "2"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "4",
+          "label": "4"
+        },
+        {
+          "value": "5+",
+          "label": "5+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "business_entities",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "business"
+          }
+        },
+        {
+          "to": "investment_details",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "investment"
+          }
+        },
+        {
+          "to": "crypto_volume",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "crypto"
+          }
+        },
+        {
+          "to": "rental_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "rental"
+          }
+        },
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 5
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "business_entities": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Which business entity types do you own or partner in?",
+      "options": [
+        {
+          "value": "sole_prop",
+          "label": "Sole Proprietor / Schedule C"
+        },
+        {
+          "value": "single_llc",
+          "label": "Single-member LLC"
+        },
+        {
+          "value": "multi_llc",
+          "label": "Multi-member LLC / Partnership"
+        },
+        {
+          "value": "s_corp",
+          "label": "S-Corporation"
+        },
+        {
+          "value": "c_corp",
+          "label": "C-Corporation"
+        },
+        {
+          "value": "partnership",
+          "label": "Partnership (non-LLC)"
+        },
+        {
+          "value": "trust",
+          "label": "Trust / Estate"
+        },
+        {
+          "value": "nonprofit",
+          "label": "Nonprofit / 501(c)"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "business_count_band"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "business_count_band": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Across all entities, how many separate business returns?",
+      "options": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2-3",
+          "label": "2-3"
+        },
+        {
+          "value": "4-5",
+          "label": "4-5"
+        },
+        {
+          "value": "6+",
+          "label": "6+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "books_ready"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 4
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "books_ready": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Which of these are already prepared for the full year?",
+      "options": [
+        {
+          "value": "pnl",
+          "label": "Profit & Loss (Income Statement)"
+        },
+        {
+          "value": "balance",
+          "label": "Balance Sheet (beginning and end of year)"
+        },
+        {
+          "value": "gl",
+          "label": "General Ledger"
+        },
+        {
+          "value": "trial",
+          "label": "Trial Balance"
+        },
+        {
+          "value": "bank_recs",
+          "label": "Bank reconciliations"
+        },
+        {
+          "value": "none",
+          "label": "None / unsure"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "employee_band"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "employee_band": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many W-2 employees across all businesses?",
+      "options": [
+        {
+          "value": "0",
+          "label": "None"
+        },
+        {
+          "value": "1-10",
+          "label": "1-10"
+        },
+        {
+          "value": "10-50",
+          "label": "10-50"
+        },
+        {
+          "value": "50-500",
+          "label": "50-500"
+        },
+        {
+          "value": "500-1000",
+          "label": "500-1,000"
+        },
+        {
+          "value": "1000+",
+          "label": "1,000 or more"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "contractor_band"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 3
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "contractor_band": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many 1099 contractors paid over $600 in 2025?",
+      "options": [
+        {
+          "value": "0",
+          "label": "0"
+        },
+        {
+          "value": "1-5",
+          "label": "1-5"
+        },
+        {
+          "value": "6-20",
+          "label": "6-20"
+        },
+        {
+          "value": "21-50",
+          "label": "21-50"
+        },
+        {
+          "value": "50+",
+          "label": "50+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "ppp_eidl"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 5
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "ppp_eidl": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Any pandemic-era loans or credits still open?",
+      "options": [
+        {
+          "value": "ppp_forgiven",
+          "label": "PPP (forgiven)"
+        },
+        {
+          "value": "ppp_pending",
+          "label": "PPP (forgiveness pending)"
+        },
+        {
+          "value": "eidl",
+          "label": "EIDL loan still outstanding"
+        },
+        {
+          "value": "erc",
+          "label": "Employee Retention Credit claimed"
+        },
+        {
+          "value": "none",
+          "label": "None"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "fringe_benefits"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "fringe_benefits": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Fringe benefits or business deductions to account for?",
+      "options": [
+        {
+          "value": "company_car",
+          "label": "Company vehicle / personal use"
+        },
+        {
+          "value": "reimburse",
+          "label": "Accountable-plan reimbursements"
+        },
+        {
+          "value": "home_office",
+          "label": "Home office"
+        },
+        {
+          "value": "meals",
+          "label": "Business meals / travel"
+        },
+        {
+          "value": "education",
+          "label": "Education / tuition assistance"
+        },
+        {
+          "value": "none",
+          "label": "None"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "business_retirement"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "business_retirement": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Business-side retirement plans in 2025?",
+      "options": [
+        {
+          "value": "solo_401k",
+          "label": "Solo 401(k)"
+        },
+        {
+          "value": "sep_ira",
+          "label": "SEP-IRA"
+        },
+        {
+          "value": "simple_ira",
+          "label": "SIMPLE IRA"
+        },
+        {
+          "value": "401k",
+          "label": "Traditional 401(k) plan"
+        },
+        {
+          "value": "defined",
+          "label": "Defined benefit / cash balance plan"
+        },
+        {
+          "value": "none",
+          "label": "None"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "investment_details",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "investment"
+          }
+        },
+        {
+          "to": "crypto_volume",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "crypto"
+          }
+        },
+        {
+          "to": "rental_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "rental"
+          }
+        },
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "investment_details": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "What types of investments did you hold?",
+      "options": [
+        {
+          "value": "brokerage",
+          "label": "Taxable brokerage (stocks, ETFs)"
+        },
+        {
+          "value": "options",
+          "label": "Options / derivatives"
+        },
+        {
+          "value": "private",
+          "label": "Private equity / angel / K-1s"
+        },
+        {
+          "value": "real_estate",
+          "label": "REITs"
+        },
+        {
+          "value": "hsa",
+          "label": "HSA"
+        },
+        {
+          "value": "529",
+          "label": "529 plan"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "brokerage_count",
+          "rule": {
+            "op": "contains",
+            "field": "investment_details",
+            "value": "brokerage"
+          }
+        },
+        {
+          "to": "k1_count",
+          "rule": {
+            "op": "contains",
+            "field": "investment_details",
+            "value": "private"
+          }
+        },
+        {
+          "to": "crypto_volume",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "crypto"
+          }
+        },
+        {
+          "to": "rental_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "rental"
+          }
+        },
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "brokerage_count": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many brokerage 1099-B statements will you receive?",
+      "options": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2",
+          "label": "2"
+        },
+        {
+          "value": "3",
+          "label": "3"
+        },
+        {
+          "value": "4-5",
+          "label": "4-5"
+        },
+        {
+          "value": "6+",
+          "label": "6+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "k1_count",
+          "rule": {
+            "op": "contains",
+            "field": "investment_details",
+            "value": "private"
+          }
+        },
+        {
+          "to": "crypto_volume",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "crypto"
+          }
+        },
+        {
+          "to": "rental_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "rental"
+          }
+        },
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 5
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "k1_count": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many K-1s will you receive?",
+      "options": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2-3",
+          "label": "2-3"
+        },
+        {
+          "value": "4-6",
+          "label": "4-6"
+        },
+        {
+          "value": "7-10",
+          "label": "7-10"
+        },
+        {
+          "value": "10+",
+          "label": "10+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "crypto_volume",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "crypto"
+          }
+        },
+        {
+          "to": "rental_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "rental"
+          }
+        },
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 5
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "crypto_volume": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Roughly how many crypto transactions in 2025?",
+      "options": [
+        {
+          "value": "0-10",
+          "label": "Fewer than 10"
+        },
+        {
+          "value": "10-100",
+          "label": "10-100"
+        },
+        {
+          "value": "100-1000",
+          "label": "100-1,000"
+        },
+        {
+          "value": "1000-10000",
+          "label": "1,000-10,000"
+        },
+        {
+          "value": "10000+",
+          "label": "More than 10,000"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "crypto_activity"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 5
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "crypto_activity": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Which crypto activities apply?",
+      "options": [
+        {
+          "value": "trading",
+          "label": "Buying / selling"
+        },
+        {
+          "value": "staking",
+          "label": "Staking rewards"
+        },
+        {
+          "value": "mining",
+          "label": "Mining"
+        },
+        {
+          "value": "nfts",
+          "label": "NFTs"
+        },
+        {
+          "value": "defi",
+          "label": "DeFi (lending, LP, yield)"
+        },
+        {
+          "value": "airdrops",
+          "label": "Airdrops / forks"
+        },
+        {
+          "value": "payments",
+          "label": "Received crypto as payment"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "crypto_report_ready"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "crypto_report_ready": {
+      "verb": "ask",
+      "type": "boolean",
+      "question": "Do you already have a CoinTracker / Koinly / TokenTax tax report covering 2025?",
+      "transitions": [
+        {
+          "to": "rental_count",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "rental"
+          }
+        },
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "yes_no"
+        },
+        "desktop": {
+          "type": "yes_no_buttons"
+        },
+        "mobile": {
+          "type": "yes_no_buttons"
+        }
+      }
+    },
+    "rental_count": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many rental properties do you own?",
+      "options": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2-3",
+          "label": "2-3"
+        },
+        {
+          "value": "4-6",
+          "label": "4-6"
+        },
+        {
+          "value": "7-10",
+          "label": "7-10"
+        },
+        {
+          "value": "10+",
+          "label": "10+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "rental_types"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 5
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "rental_types": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "What types of rental properties?",
+      "options": [
+        {
+          "value": "residential_long",
+          "label": "Residential long-term"
+        },
+        {
+          "value": "short_term",
+          "label": "Short-term (Airbnb / VRBO)"
+        },
+        {
+          "value": "commercial",
+          "label": "Commercial"
+        },
+        {
+          "value": "vacation",
+          "label": "Vacation / mixed personal use"
+        },
+        {
+          "value": "foreign_rental",
+          "label": "Foreign rental"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "foreign_earned",
+          "rule": {
+            "op": "contains",
+            "field": "income_types",
+            "value": "foreign"
+          }
+        },
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "foreign_earned": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "What foreign income situation applies?",
+      "options": [
+        {
+          "value": "worked_abroad",
+          "label": "Worked abroad during 2025"
+        },
+        {
+          "value": "foreign_employer",
+          "label": "Paid by a foreign employer"
+        },
+        {
+          "value": "foreign_self",
+          "label": "Self-employed abroad"
+        },
+        {
+          "value": "us_expat",
+          "label": "US citizen living abroad"
+        },
+        {
+          "value": "treaty",
+          "label": "Tax treaty benefits expected"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "state_filing"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "state_filing": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Select every state (and DC) you need to file a return in.",
+      "options": [
+        {
+          "value": "AL",
+          "label": "AL"
+        },
+        {
+          "value": "AK",
+          "label": "AK"
+        },
+        {
+          "value": "AZ",
+          "label": "AZ"
+        },
+        {
+          "value": "AR",
+          "label": "AR"
+        },
+        {
+          "value": "CA",
+          "label": "CA"
+        },
+        {
+          "value": "CO",
+          "label": "CO"
+        },
+        {
+          "value": "CT",
+          "label": "CT"
+        },
+        {
+          "value": "DE",
+          "label": "DE"
+        },
+        {
+          "value": "FL",
+          "label": "FL"
+        },
+        {
+          "value": "GA",
+          "label": "GA"
+        },
+        {
+          "value": "HI",
+          "label": "HI"
+        },
+        {
+          "value": "ID",
+          "label": "ID"
+        },
+        {
+          "value": "IL",
+          "label": "IL"
+        },
+        {
+          "value": "IN",
+          "label": "IN"
+        },
+        {
+          "value": "IA",
+          "label": "IA"
+        },
+        {
+          "value": "KS",
+          "label": "KS"
+        },
+        {
+          "value": "KY",
+          "label": "KY"
+        },
+        {
+          "value": "LA",
+          "label": "LA"
+        },
+        {
+          "value": "ME",
+          "label": "ME"
+        },
+        {
+          "value": "MD",
+          "label": "MD"
+        },
+        {
+          "value": "MA",
+          "label": "MA"
+        },
+        {
+          "value": "MI",
+          "label": "MI"
+        },
+        {
+          "value": "MN",
+          "label": "MN"
+        },
+        {
+          "value": "MS",
+          "label": "MS"
+        },
+        {
+          "value": "MO",
+          "label": "MO"
+        },
+        {
+          "value": "MT",
+          "label": "MT"
+        },
+        {
+          "value": "NE",
+          "label": "NE"
+        },
+        {
+          "value": "NV",
+          "label": "NV"
+        },
+        {
+          "value": "NH",
+          "label": "NH"
+        },
+        {
+          "value": "NJ",
+          "label": "NJ"
+        },
+        {
+          "value": "NM",
+          "label": "NM"
+        },
+        {
+          "value": "NY",
+          "label": "NY"
+        },
+        {
+          "value": "NC",
+          "label": "NC"
+        },
+        {
+          "value": "ND",
+          "label": "ND"
+        },
+        {
+          "value": "OH",
+          "label": "OH"
+        },
+        {
+          "value": "OK",
+          "label": "OK"
+        },
+        {
+          "value": "OR",
+          "label": "OR"
+        },
+        {
+          "value": "PA",
+          "label": "PA"
+        },
+        {
+          "value": "RI",
+          "label": "RI"
+        },
+        {
+          "value": "SC",
+          "label": "SC"
+        },
+        {
+          "value": "SD",
+          "label": "SD"
+        },
+        {
+          "value": "TN",
+          "label": "TN"
+        },
+        {
+          "value": "TX",
+          "label": "TX"
+        },
+        {
+          "value": "UT",
+          "label": "UT"
+        },
+        {
+          "value": "VT",
+          "label": "VT"
+        },
+        {
+          "value": "VA",
+          "label": "VA"
+        },
+        {
+          "value": "WA",
+          "label": "WA"
+        },
+        {
+          "value": "WV",
+          "label": "WV"
+        },
+        {
+          "value": "WI",
+          "label": "WI"
+        },
+        {
+          "value": "WY",
+          "label": "WY"
+        },
+        {
+          "value": "DC",
+          "label": "DC"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "state_residency"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 10,
+          "layout": "grid"
+        },
+        "mobile": {
+          "type": "multi_select_dropdown"
+        }
+      }
+    },
+    "state_residency": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Were you a resident of more than one state during 2025?",
+      "options": [
+        {
+          "value": "no",
+          "label": "No, one state all year"
+        },
+        {
+          "value": "part_year",
+          "label": "Yes, part-year resident"
+        },
+        {
+          "value": "multi",
+          "label": "Yes, multiple states"
+        },
+        {
+          "value": "non_resident",
+          "label": "No, but earned income in another state"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "foreign_accounts"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "foreign_accounts": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Did you hold foreign financial accounts in 2025?",
+      "options": [
+        {
+          "value": "no",
+          "label": "No"
+        },
+        {
+          "value": "under10k",
+          "label": "Yes, aggregate always under $10,000"
+        },
+        {
+          "value": "over10k",
+          "label": "Yes, aggregate exceeded $10,000"
+        },
+        {
+          "value": "unsure",
+          "label": "Not sure"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "foreign_account_count",
+          "rule": {
+            "op": "equals",
+            "field": "foreign_accounts",
+            "value": "over10k"
+          }
+        },
+        {
+          "to": "foreign_account_count",
+          "rule": {
+            "op": "equals",
+            "field": "foreign_accounts",
+            "value": "unsure"
+          }
+        },
+        {
+          "to": "surprise_heads_up"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "foreign_account_count": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How many foreign accounts?",
+      "options": [
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2-3",
+          "label": "2-3"
+        },
+        {
+          "value": "4-10",
+          "label": "4-10"
+        },
+        {
+          "value": "10+",
+          "label": "10+"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "surprise_heads_up"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 4
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "surprise_heads_up": {
+      "verb": "warning",
+      "text": "Last stretch: items that commonly arrive late and add billable\nhours. Flagging them now keeps our quote accurate.",
+      "transitions": [
+        {
+          "to": "tax_notices"
+        }
+      ]
+    },
+    "tax_notices": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Any outstanding tax notices we should know about?",
+      "options": [
+        {
+          "value": "irs_cp2000",
+          "label": "IRS CP2000 (underreported income)"
+        },
+        {
+          "value": "irs_balance",
+          "label": "IRS balance-due notice"
+        },
+        {
+          "value": "irs_audit",
+          "label": "IRS audit or examination"
+        },
+        {
+          "value": "irs_identity",
+          "label": "IRS identity verification"
+        },
+        {
+          "value": "irs_lien_levy",
+          "label": "IRS lien or levy"
+        },
+        {
+          "value": "state_notice",
+          "label": "State or local tax notice"
+        },
+        {
+          "value": "none",
+          "label": "None"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "estimated_payments"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "estimated_payments": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Did you make 2025 federal estimated tax payments?",
+      "options": [
+        {
+          "value": "all_four",
+          "label": "Yes, all four quarters"
+        },
+        {
+          "value": "some",
+          "label": "Yes, some quarters"
+        },
+        {
+          "value": "none",
+          "label": "No"
+        },
+        {
+          "value": "refund",
+          "label": "No — applied prior-year refund instead"
+        },
+        {
+          "value": "unsure",
+          "label": "Not sure"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "deduction_types"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "deduction_types": {
+      "verb": "ask",
+      "type": "multi_enum",
+      "question": "Which deductions or credits apply?",
+      "options": [
+        {
+          "value": "mortgage",
+          "label": "Mortgage interest"
+        },
+        {
+          "value": "salt",
+          "label": "State & local taxes (SALT)"
+        },
+        {
+          "value": "medical",
+          "label": "Major medical expenses"
+        },
+        {
+          "value": "charitable",
+          "label": "Charitable contributions"
+        },
+        {
+          "value": "education",
+          "label": "Education credits / student loan interest"
+        },
+        {
+          "value": "energy",
+          "label": "Energy / EV credits"
+        },
+        {
+          "value": "childcare",
+          "label": "Childcare expenses"
+        },
+        {
+          "value": "hsa_fsa",
+          "label": "HSA / FSA contributions"
+        },
+        {
+          "value": "none",
+          "label": "None / standard deduction"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "charitable_band",
+          "rule": {
+            "op": "contains",
+            "field": "deduction_types",
+            "value": "charitable"
+          }
+        },
+        {
+          "to": "timeline"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "multi_select"
+        },
+        "desktop": {
+          "type": "checkbox_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "checkbox_group"
+        }
+      }
+    },
+    "charitable_band": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "Roughly how much in charitable contributions?",
+      "options": [
+        {
+          "value": "under1k",
+          "label": "Under $1,000"
+        },
+        {
+          "value": "1k-5k",
+          "label": "$1,000 - $5,000"
+        },
+        {
+          "value": "5k-25k",
+          "label": "$5,000 - $25,000"
+        },
+        {
+          "value": "25k-100k",
+          "label": "$25,000 - $100,000"
+        },
+        {
+          "value": "over100k",
+          "label": "Over $100,000"
+        },
+        {
+          "value": "non_cash",
+          "label": "Includes non-cash donations"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "timeline"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 3
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "timeline": {
+      "verb": "ask",
+      "type": "enum",
+      "question": "How soon do you need this return filed?",
+      "options": [
+        {
+          "value": "asap",
+          "label": "As soon as possible"
+        },
+        {
+          "value": "by_april",
+          "label": "By the April deadline"
+        },
+        {
+          "value": "extension",
+          "label": "Happy to file an extension"
+        },
+        {
+          "value": "already_ext",
+          "label": "Already on extension"
+        }
+      ],
+      "transitions": [
+        {
+          "to": "client_email"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "select"
+        },
+        "desktop": {
+          "type": "radio_group",
+          "columns": 2
+        },
+        "mobile": {
+          "type": "dropdown"
+        }
+      }
+    },
+    "client_email": {
+      "verb": "ask",
+      "type": "email",
+      "question": "Email address to send your fee quote to:",
+      "transitions": [
+        {
+          "to": "thanks"
+        }
+      ],
+      "widget": {
+        "tty": {
+          "type": "text_input"
+        },
+        "desktop": {
+          "type": "email_input"
+        },
+        "mobile": {
+          "type": "email_input"
+        }
+      }
+    },
+    "thanks": {
+      "verb": "say",
+      "text": "Thanks! We'll email your fee quote and a document checklist\nwithin one business day. No personal information was stored."
+    }
+  }
+}
