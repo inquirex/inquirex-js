@@ -1,27 +1,55 @@
 # inquirex-js
 
-Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/flowengine-rb/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs collected answers back to the same URL.
+Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/flowengine-rb/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs collected answers to your server.
 
-**49KB** single-file bundle (14KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles completely.
+**52KB** single-file browser bundle (about 16KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles completely.
 
 ## Quick Start
 
-Add one script tag to any page:
+There are two common ways to use `inquirex-js`:
+
+1. **Use Qualified.at.** Qualified.at generates the flow, endpoint URLs, LLM wiring, domain restrictions, and a minified script snippet for you.
+1. **Self-host it.** Install the NPM package or serve the browser bundle yourself, then provide URLs for the Flow DSL, completed-answer submission, and optional LLM/server verbs.
+
+### Qualified.at Hosted Embed
+
+Qualified.at can generate a single minified script per form. In that mode the flow JSON, submit URL, LLM URL, launch behavior, position, and theme are baked into the generated file:
 
 ```html
-<script src="https://qualified.at/inquirex.js"
-        data-flow-url="https://your-server.com/api/flows/tax-intake"
-        data-flow-llm-prefix="https://your-server.com/api/llm"></script>
+<script async
+  src="https://qualified.at/intake/inquirex-tax-preparer-2025.js">
+</script>
+```
+
+That is the lowest-effort production path. The snippet is tied to the site you configured in Qualified.at, and LLM verbs such as `extract` are handled by the platform backend so your AI API keys never touch the browser.
+
+### Self-Hosted Embed Without LLM
+
+If you only need deterministic branching, provide a DSL URL and a submit URL:
+
+```html
+<script src="https://example.com/assets/inquirex.js"
+        data-inquirex-dsl="https://example.com/inquirex/form.json"
+        data-inquirex-submit-to="https://example.com/inquirex"></script>
 ```
 
 That's it. A chat bubble appears in the bottom-right corner. Clicking it opens the questionnaire panel.
 
-- **`data-flow-url`** — the widget `GET`s the flow definition here and `POST`s the
-  final answers back to the same URL.
-- **`data-flow-llm-prefix`** — optional. Where `extract` steps round-trip
-  mid-flow: the widget `POST`s to `{prefix}/extract` and gets back structured
-  answers that pre-fill (and skip) later questions. Omit it and `extract` steps
-  degrade to a plain form.
+### Self-Hosted Embed With LLM Verbs
+
+To support `extract` or future server-side verbs, add `data-inquirex-llm-url`.
+The browser still sends only data; your backend loads the canonical DSL, owns the prompt/schema/model, calls the LLM, validates output, and returns structured answers.
+
+```html
+<script src="https://example.com/assets/inquirex.js"
+        data-inquirex-dsl="https://example.com/inquirex/form.json"
+        data-inquirex-submit-to="https://example.com/inquirex"
+        data-inquirex-llm-url="https://example.com/inquirex/llm"
+        data-inquirex-launch="delay"
+        data-inquirex-open-delay="1000"
+        data-inquirex-position="bottom-right"
+        data-inquirex-theme='{"brand":"#2563eb","headerBackground":"#111827","headerText":"#ffffff"}'></script>
+```
 
 The widget sends only **data** — flow id, step id, answers-so-far, and a bearer
 session token. Prompts, models, and schemas stay server-side. See
@@ -30,20 +58,23 @@ and the anti-spoofing design.
 
 ## How It Works
 
-The `data-flow-url` attribute points to **your server**. The widget uses that single URL for both directions, distinguished by HTTP method:
+The new script-tag API separates the three URLs instead of pretending one endpoint should do every job:
 
-| Method | Purpose | Content-Type |
-|--------|---------|-------------|
-| **GET** | Fetch the flow definition JSON | Response: `application/json` |
-| **POST** | Submit completed answers | Request: `application/json` |
+| Attribute | Method | Purpose |
+|-----------|--------|---------|
+| `data-inquirex-dsl` | `GET` | Fetch the Flow DSL JSON |
+| `data-inquirex-submit-to` | `POST` | Submit the completed answer payload |
+| `data-inquirex-llm-url` | `POST` | Optional server/LLM verb endpoint |
+
+For backward compatibility, `data-flow-url` still works as a combined GET/POST URL, and `data-flow-llm-prefix` still posts `extract` requests to `{prefix}/extract`.
 
 ### GET — Serve the Flow Definition
 
-When the widget loads, it makes a `GET` request to your URL and expects a JSON response matching the [Inquirex wire format](#json-wire-format). In Ruby, this is what `definition.to_json` produces.
+When the widget loads, it makes a `GET` request to `data-inquirex-dsl` and expects a JSON response matching the [Inquirex wire format](#json-wire-format). In Ruby, this is what `definition.to_json` produces.
 
 ### End of the Form: POST — Receive Completed Answers
 
-When the user finishes the questionnaire, the widget POSTs a JSON body:
+When the user finishes the questionnaire, the widget POSTs a JSON body to `data-inquirex-submit-to`:
 
 ```json
 {
@@ -79,44 +110,120 @@ If the flow declares [accumulators](#accumulators) (e.g. a `:price` running tota
 }
 ```
 
-## Attributes
+### Server/LLM Verb POST
+
+When the flow reaches an `extract` step and `data-inquirex-llm-url` is configured, the widget calls:
+
+```http
+POST https://example.com/inquirex/llm?verb=extract&inquirex_dsl=https%3A%2F%2Fexample.com%2Finquirex%2Fform.json
+Content-Type: application/json
+```
+
+```json
+{
+  "flow_id": "tax-preparer-2025",
+  "version": "2.0.0",
+  "verb": "extract",
+  "step": "extract_business_details",
+  "answers": {
+    "describe_your_businesses": "I have two businesses..."
+  }
+}
+```
+
+Your server routes by `verb`, reloads the canonical DSL from `inquirex_dsl`, decides what prompt/schema/model apply to `step`, and returns validated fields. If the call fails or times out, the widget falls back to asking the remaining questions normally.
+
+## Script Attributes
 
 | Attribute | Description |
 |-----------|-------------|
-| `data-flow-url` | URL for GET (fetch flow) and POST (submit answers) |
-| `data-site-id` | Shorthand — expands to `https://qualified.at/api/flows/{site-id}` |
-| `data-flow-json` | Inline JSON string (no GET request; POST still uses `data-flow-url` if set) |
-| `data-flow-llm-prefix` | URL prefix for `extract` round-trips (`POST {prefix}/extract`). Omit to disable LLM steps |
-| `data-flow-llm-timeout` | Client timeout in ms for an `extract` call before falling back (default `20000`) |
+| `data-inquirex-dsl` | URL for fetching the Flow DSL JSON |
+| `data-inquirex-submit-to` | URL for posting the completed answer payload. Defaults to the DSL URL when omitted |
+| `data-inquirex-llm-url` | Exact endpoint for server/LLM verbs such as `extract` |
+| `data-inquirex-llm-timeout` | Client timeout in ms for a server verb call before falling back. Default: `20000` |
+| `data-inquirex-flow-json` | Inline JSON string for the flow definition. Avoids the DSL `GET` |
+| `data-inquirex-launch` | `click`, `open`, or `delay`. Default: `click` |
+| `data-inquirex-open-delay` | Delay in ms for `data-inquirex-launch="delay"`. Default: `1000` |
+| `data-inquirex-position` | `bottom-right` or `bottom-left`. Default: `bottom-right` |
+| `data-inquirex-theme` | JSON object of theme keys or raw `--iq-*` custom properties |
+| `data-site-id` | Qualified.at shorthand; expands to `https://qualified.at/api/flows/{site-id}` |
 
-Priority: `data-flow-json` (for the definition) > `data-flow-url` > `data-site-id`.
+Legacy aliases remain supported:
+
+| Legacy attribute | New equivalent |
+|------------------|----------------|
+| `data-flow-url` | `data-inquirex-dsl` plus default submit URL |
+| `data-flow-json` | `data-inquirex-flow-json` |
+| `data-flow-llm-url` | `data-inquirex-llm-url` |
+| `data-flow-llm-prefix` | Legacy `{prefix}/extract` endpoint mode |
+| `data-flow-llm-timeout` | `data-inquirex-llm-timeout` |
+
+Priority for the definition source: `data-inquirex-flow-json` > `data-inquirex-dsl` / `data-flow-url` > `data-site-id`.
+
+## NPM Usage
+
+Install the package and import it from your application bundle:
+
+```bash
+npm install inquirex-js
+```
+
+```ts
+import "inquirex-js";
+```
+
+The package publishes both modern ESM and a browser IIFE:
+
+| Build | Use case |
+|-------|----------|
+| `dist/inquirex.mjs` | ESM import from build tools |
+| `dist/inquirex.js` | `<script src="...">` / CDN usage |
+
+Importing either build registers `<inquirex-widget>`.
 
 ### Programmatic Usage
 
-You can also create the widget element directly:
+In a bundled app, import the package once and create the element directly:
+
+```ts
+import "inquirex-js";
+
+const widget = document.createElement("inquirex-widget");
+widget.setAttribute("flow-url", "/inquirex/form.json");
+widget.setAttribute("submit-url", "/inquirex");
+widget.setAttribute("flow-llm-url", "/inquirex/llm");
+widget.setAttribute("launch-mode", "click");
+widget.setAttribute("position", "bottom-left");
+widget.style.setProperty("--iq-header-bg", "#111827");
+widget.style.setProperty("--iq-header-text", "#ffffff");
+document.body.appendChild(widget);
+```
+
+Or, after the browser bundle has loaded, write the custom element in HTML:
 
 ```html
-<script type="module">
-  import 'https://qualified.at/inquirex.js';
-
-  const widget = document.createElement('inquirex-widget');
-  widget.setAttribute('flow-url', '/api/flows/my-flow');
-  document.body.appendChild(widget);
-</script>
+<inquirex-widget
+  flow-url="/inquirex/form.json"
+  submit-url="/inquirex"
+  flow-llm-url="/inquirex/llm"
+  launch-mode="click"
+  position="bottom-left"
+  style="--iq-header-bg:#111827; --iq-header-text:#fff;">
+</inquirex-widget>
 ```
 
 ## CORS Setup
 
 Since the widget runs on **your customer's site** (e.g. `example.com`) but fetches from **your API** (e.g. `api.qualified.at`), the browser enforces cross-origin restrictions. Your API server must include CORS headers.
 
-The `GET` request is simple, but the `POST` sends `Content-Type: application/json`, which triggers a **preflight OPTIONS request**. Your server must handle all three: `OPTIONS`, `GET`, and `POST`.
+The `GET` request is simple, but the `POST` requests send `Content-Type: application/json` and may send `Authorization: Bearer ...` for server/LLM verbs. That triggers a **preflight OPTIONS request**. Your server must handle `OPTIONS`, `GET`, and `POST` for the DSL and submit endpoints, plus `OPTIONS` and `POST` for the LLM endpoint.
 
 ### Required Response Headers
 
 ```
 Access-Control-Allow-Origin: *
 Access-Control-Allow-Methods: GET, POST, OPTIONS
-Access-Control-Allow-Headers: Content-Type
+Access-Control-Allow-Headers: Content-Type, Authorization
 Access-Control-Max-Age: 86400
 ```
 
@@ -133,7 +240,7 @@ location /api/flows/ {
     if ($request_method = 'OPTIONS') {
         add_header 'Access-Control-Allow-Origin' '*';
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
-        add_header 'Access-Control-Allow-Headers' 'Content-Type';
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
         add_header 'Access-Control-Max-Age' 86400;
         add_header 'Content-Length' 0;
         return 204;
@@ -141,7 +248,24 @@ location /api/flows/ {
 
     add_header 'Access-Control-Allow-Origin' '*';
     add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
-    add_header 'Access-Control-Allow-Headers' 'Content-Type';
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+
+    proxy_pass http://upstream;
+}
+
+location /api/inquirex/llm {
+    if ($request_method = 'OPTIONS') {
+        add_header 'Access-Control-Allow-Origin' '*';
+        add_header 'Access-Control-Allow-Methods' 'POST, OPTIONS';
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
+        add_header 'Access-Control-Max-Age' 86400;
+        add_header 'Content-Length' 0;
+        return 204;
+    }
+
+    add_header 'Access-Control-Allow-Origin' '*';
+    add_header 'Access-Control-Allow-Methods' 'POST, OPTIONS';
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
 
     proxy_pass http://upstream;
 }
@@ -155,8 +279,11 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
     origins '*'
     resource '/api/flows/*',
-      headers: %w[Content-Type],
+      headers: %w[Content-Type Authorization],
       methods: %i[get post options]
+    resource '/api/inquirex/llm',
+      headers: %w[Content-Type Authorization],
+      methods: %i[post options]
   end
 end
 ```
@@ -169,7 +296,14 @@ const cors = require('cors');
 app.use('/api/flows', cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400,
+}));
+
+app.use('/api/inquirex/llm', cors({
+  origin: '*',
+  methods: ['POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   maxAge: 86400,
 }));
 ```
@@ -188,7 +322,7 @@ createServer((req, res) => {
   // CORS headers on every response
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204).end();
@@ -320,6 +454,8 @@ end
 | `header` | No | Section heading |
 | `btw` | No | Sidebar / admonition |
 | `warning` | No | Alert message |
+| `extract` | No | Server/LLM verb that turns previous free text into structured answers |
+| `clarify` | No | Backward-compatible alias for `extract` |
 
 ### Data Types
 
@@ -465,14 +601,19 @@ This function mirrors `Inquirex::Accumulation#contribution` in Ruby one-for-one.
 
 ## Theming
 
-The widget's look is driven entirely by CSS custom properties on its shadow root. You don't touch CSS directly — you pass a `theme` object in the flow JSON and each key maps 1:1 to a property.
+The widget's look is driven by CSS custom properties on the custom element. You can set them three ways:
+
+1. Add `meta.theme` to the flow JSON.
+1. Pass `data-inquirex-theme` on the script tag.
+1. Set raw `--iq-*` variables on `<inquirex-widget>`.
 
 ### Minimal — just a brand color
 
 ```json
 "meta": {
   "title": "Tax Preparation",
-  "brand": { "name": "Agentica", "color": "#2563eb" }
+  "brand": { "name": "Agentica" },
+  "theme": { "brand": "#2563eb" }
 }
 ```
 
@@ -485,8 +626,10 @@ For more control, add a `theme` object alongside `brand`:
 ```json
 "meta": {
   "title": "Midnight Studio",
-  "brand": { "name": "Midnight", "color": "#f59e0b" },
+  "brand": { "name": "Midnight" },
   "theme": {
+    "brand":      "#f59e0b",
+    "highlight":  "#22c55e",
     "background": "#0f172a",
     "surface":    "#1e293b",
     "text":       "#f1f5f9",
@@ -494,7 +637,19 @@ For more control, add a `theme` object alongside `brand`:
     "border":     "#334155",
     "radius":     "12px",
     "font":       "'Inter', sans-serif",
-    "headerFont": "'Bricolage Grotesque', serif"
+    "fontSize":   "15px",
+    "headerFont": "'Bricolage Grotesque', serif",
+    "headerFontSize": "18px",
+    "headerBackground": "#111827",
+    "headerText": "#ffffff",
+    "questionBubbleBackground": "#ffffff",
+    "questionBubbleText": "#111827",
+    "answerBubbleBackground": "#2563eb",
+    "answerBubbleText": "#ffffff",
+    "padding": "16px",
+    "triggerBackground": "#2563eb",
+    "triggerText": "#ffffff",
+    "triggerRadius": "50%"
   }
 }
 ```
@@ -505,7 +660,8 @@ Every key is optional — omit any and the widget default is used.
 
 | Key | CSS variable | Default | Controls |
 |-----|--------------|---------|----------|
-| `brand` | `--iq-brand` | `#2563eb` | Bubble, header gradient, answer bubbles, buttons, progress bar |
+| `brand` | `--iq-brand` | `#2563eb` | Primary brand color |
+| `highlight` | `--iq-highlight` | `var(--iq-brand)` | Focus rings, selected controls, progress accents |
 | `onBrand` | `--iq-on-brand` | _auto-computed_ | Text/icon color on top of the brand color (override the auto-contrast) |
 | `background` | `--iq-bg` | `#f8f7f4` | Panel body background |
 | `surface` | `--iq-surface` | `#ffffff` | Message bubble & input backgrounds |
@@ -514,11 +670,25 @@ Every key is optional — omit any and the widget default is used.
 | `border` | `--iq-border` | `#e7e5e4` | Input borders, dividers |
 | `radius` | `--iq-radius` | `18px` | Panel corner radius |
 | `font` | `--iq-font` | `'Outfit', system-ui` | Body font stack |
+| `fontSize` | `--iq-font-size` | `15px` | Base widget font size |
 | `headerFont` | `--iq-header-font` | _inherits from `font`_ | Header title font stack |
+| `headerFontSize` | `--iq-header-font-size` | `18px` | Header title size |
+| `headerBackground` | `--iq-header-bg` | Brand gradient | Header background color or gradient |
+| `headerText` | `--iq-header-text` | `var(--iq-on-brand)` | Header text and icon color |
+| `questionBubbleBackground` | `--iq-question-bg` | `var(--iq-surface)` | Question bubble background |
+| `questionBubbleText` | `--iq-question-text` | `var(--iq-text)` | Question bubble text color |
+| `answerBubbleBackground` | `--iq-answer-bg` | `var(--iq-brand)` | Answer bubble and primary button background |
+| `answerBubbleText` | `--iq-answer-text` | `var(--iq-on-brand)` | Answer bubble and primary button text |
+| `padding` | `--iq-padding` | `16px` | Conversation area padding |
+| `triggerBackground` | `--iq-trigger-bg` | `var(--iq-brand)` | Floating launcher background |
+| `triggerText` | `--iq-trigger-text` | `var(--iq-on-brand)` | Floating launcher icon color |
+| `triggerRadius` | `--iq-trigger-radius` | `50%` | Floating launcher corner radius |
+
+Advanced script-tag themes may also set raw `--iq-*` variables, including `--iq-panel-width`, `--iq-panel-max-height`, `--iq-trigger-size`, `--iq-widget-offset-block`, and `--iq-widget-offset-inline`.
 
 ### About fonts
 
-The widget **does not load external fonts**. It ships with `Outfit` for its own chrome and assumes that whatever font you specify in `theme.font` / `theme.headerFont` is **already loaded on the embedding page** (that's the usual case — you're only overriding fonts to match your own site's typography, which you already serve). If the font you name isn't available, the widget quietly falls back through this chain:
+The widget loads its default `Outfit` font for its own chrome. Whatever font you specify in `theme.font` / `theme.headerFont` should already be loaded on the embedding page. If the font you name isn't available, the widget quietly falls back through this chain:
 
 1. **Your font** (e.g. `'Cairo'`)
 1. **Your fallbacks** (e.g. `sans-serif`)
@@ -546,17 +716,29 @@ Inquirex.define id: "tax-pricing-2025" do
       border:      "#1f2937",
       radius:      "18px",
       font:        "Inter, system-ui, sans-serif",
-      header_font: "Inter, system-ui, sans-serif"
+      font_size:   "15px",
+      header_font: "Inter, system-ui, sans-serif",
+      header_font_size: "18px",
+      header_background: "#111827",
+      header_text: "#ffffff",
+      question_bubble_background: "#ffffff",
+      question_bubble_text: "#111827",
+      answer_bubble_background: "#2563eb",
+      answer_bubble_text: "#ffffff",
+      padding: "16px",
+      trigger_background: "#2563eb",
+      trigger_text: "#ffffff",
+      trigger_radius: "50%"
     }
   # ...
 end
 ```
 
-Key translations: `on_brand → onBrand`, `text_muted → textMuted`, `header_font → headerFont`. Everything else passes through unchanged. `brand:` (top-level inside `meta`) is reserved for identity — `name` and `logo`. Colors, fonts, and radii always live under `theme:`.
+Key translations include `on_brand → onBrand`, `text_muted → textMuted`, `font_size → fontSize`, `header_font → headerFont`, `header_background → headerBackground`, and `answer_bubble_background → answerBubbleBackground`. `brand:` (top-level inside `meta`) is reserved for identity — `name` and `logo`. Colors, fonts, spacing, and radii live under `theme:`.
 
 ### Why not let me write raw CSS?
 
-Because the widget lives in Shadow DOM and every internal class name is an implementation detail that could change. Theme keys are a stable contract. This approach also stops you from accidentally breaking layout — every override is a color, a font stack, or a radius, none of which can distort the structure.
+Because the widget lives in Shadow DOM and every internal class name is an implementation detail that could change. Theme keys are a stable contract. This approach also stops you from accidentally breaking layout — the named overrides are limited to stable colors, fonts, spacing, radii, and fixed widget dimensions.
 
 If you ever need more knobs, open an issue — we'd rather add another named token than expose selectors.
 
