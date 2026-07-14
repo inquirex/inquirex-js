@@ -20,8 +20,8 @@ export class IqTextInput extends LitElement {
       box-sizing: border-box;
     }
     input:focus, textarea:focus {
-      border-color: var(--iq-brand, #2563eb);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--iq-brand, #2563eb) 15%, transparent);
+      border-color: var(--iq-highlight, #2563eb);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--iq-highlight, #2563eb) 15%, transparent);
     }
     input::placeholder, textarea::placeholder {
       color: var(--iq-text-muted, #a1a1aa);

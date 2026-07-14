@@ -122,13 +122,20 @@
     &copy; 2025 Agentica Group. This is a demo page for the Inquirex widget.
   </footer>
 
-  <!-- In dev: load as module and create widget manually.
-       In production: a single <script src="inquirex.js" data-flow-url="..."> auto-inits. -->
+  <!-- In dev: import the package entry and mount() programmatically.
+       In production a single script tag auto-inits from data-* attributes:
+         <script src="inquirex.js"
+                 data-inquirex-url="https://example.com/intake"
+                 data-inquirex-llm-url="https://example.com/intake/llm"></script>
+       Uncomment trigger/position/theme below to preview those knobs. -->
   <script type="module">
-    import './src/widget.ts';
-    const widget = document.createElement('inquirex-widget');
-    widget.setAttribute('flow-url', '/demo/tax-intake.json');
-    document.body.appendChild(widget);
+    import { mount } from './src/index.ts';
+    mount({
+      url: '/demo/tax-intake-default.json',
+      // trigger: 'delay', triggerDelay: 1000,
+      // position: 'bottom-left',
+      // theme: { headerBg: '#111827', highlight: '#f59e0b', radius: '0', launcherBg: '#111827' },
+    });
   </script>
 </body>
 </html>

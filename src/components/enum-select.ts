@@ -20,13 +20,13 @@ export class IqEnumSelect extends LitElement {
       user-select: none;
     }
     .option:hover {
-      border-color: color-mix(in srgb, var(--iq-brand, #2563eb) 50%, var(--iq-border, #d4d4d8));
-      background: color-mix(in srgb, var(--iq-brand, #2563eb) 4%, var(--iq-surface, #fff));
+      border-color: color-mix(in srgb, var(--iq-highlight, #2563eb) 50%, var(--iq-border, #d4d4d8));
+      background: color-mix(in srgb, var(--iq-highlight, #2563eb) 4%, var(--iq-surface, #fff));
     }
     .option:active { transform: scale(0.98); }
     .option[data-selected] {
-      border-color: var(--iq-brand, #2563eb);
-      background: color-mix(in srgb, var(--iq-brand, #2563eb) 8%, var(--iq-surface, #fff));
+      border-color: var(--iq-highlight, #2563eb);
+      background: color-mix(in srgb, var(--iq-highlight, #2563eb) 8%, var(--iq-surface, #fff));
     }
     .radio {
       width: 18px; height: 18px;
@@ -37,12 +37,12 @@ export class IqEnumSelect extends LitElement {
       transition: border-color 0.15s;
     }
     .option[data-selected] .radio {
-      border-color: var(--iq-brand, #2563eb);
+      border-color: var(--iq-highlight, #2563eb);
     }
     .radio-dot {
       width: 10px; height: 10px;
       border-radius: 50%;
-      background: var(--iq-brand, #2563eb);
+      background: var(--iq-highlight, #2563eb);
       transform: scale(0);
       transition: transform 0.15s ease;
     }

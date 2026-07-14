@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FlowEngine } from "../src/engine.js";
-import { runExtraction } from "../src/extract-client.js";
+import { runServerVerb } from "../src/server-verb.js";
 import type { FlowDefinition, ExtractResponse } from "../src/types.js";
 
 /**
@@ -226,7 +226,7 @@ describe("applyExtractResponse — interpreting a raw server reply", () => {
   });
 });
 
-describe("runExtraction — the fetch round-trip", () => {
+describe("runServerVerb — the fetch round-trip", () => {
   /** A fake fetch returning the given JSON body with the given status. */
   const jsonFetch = (
     body: unknown,
@@ -244,7 +244,7 @@ describe("runExtraction — the fetch round-trip", () => {
     return { fn, calls };
   };
 
-  it("posts to {prefix}/extract with data only — never a prompt", async () => {
+  it("posts to {llmUrl}?verb=&dsl= with data only — never a prompt", async () => {
     const engine = atExtractStep();
     const { fn, calls } = jsonFetch({
       status: "ok",
@@ -252,16 +252,22 @@ describe("runExtraction — the fetch round-trip", () => {
       next: "filing_status",
     });
 
-    await runExtraction(engine, {
-      llmPrefix: "https://api.example.com/llm/",
-      sessionToken: "tok-123",
+    await runServerVerb(engine, {
+      llmUrl: "https://api.example.com/llm",
+      dslUrl: "https://forms.example.com/f.json",
+      auth: "tok-123",
       fetchFn: fn,
     });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe("https://api.example.com/llm/extract"); // trailing slash normalized
+    // The verb and DSL source ride as query params; the body carries the data.
+    const u = new URL(calls[0].url);
+    expect(`${u.origin}${u.pathname}`).toBe("https://api.example.com/llm");
+    expect(u.searchParams.get("verb")).toBe("extract");
+    expect(u.searchParams.get("dsl")).toBe("https://forms.example.com/f.json");
     const body = JSON.parse(calls[0].init.body as string);
     expect(body).toEqual({
+      verb: "extract",
       flow_id: "tax-llm",
       version: "1.0.0",
       step: "extracted",
@@ -281,8 +287,8 @@ describe("runExtraction — the fetch round-trip", () => {
       answers: {},
       next: "filing_status",
     });
-    await runExtraction(engine, {
-      llmPrefix: "https://api.example.com/llm",
+    await runServerVerb(engine, {
+      llmUrl: "https://api.example.com/llm",
       fetchFn: fn,
     });
     const headers = calls[0].init.headers as Record<string, string>;
@@ -301,7 +307,7 @@ describe("runExtraction — the fetch round-trip", () => {
       },
       next: "filing_status",
     });
-    await runExtraction(engine, { llmPrefix: "x", fetchFn: fn });
+    await runServerVerb(engine, { llmUrl: "x", fetchFn: fn });
     expect(engine.answers.filing_status).toBe("single");
     expect(engine.currentStepId).toBe("client_contact"); // all four skipped
   });
@@ -309,7 +315,7 @@ describe("runExtraction — the fetch round-trip", () => {
   it("falls back on a non-2xx response (no answers merged)", async () => {
     const engine = atExtractStep();
     const { fn } = jsonFetch({ error: "boom" }, 500);
-    await runExtraction(engine, { llmPrefix: "x", fetchFn: fn });
+    await runServerVerb(engine, { llmUrl: "x", fetchFn: fn });
     expect(engine.currentStepId).toBe("filing_status");
     expect("filing_status" in engine.answers).toBe(false);
   });
@@ -323,7 +329,7 @@ describe("runExtraction — the fetch round-trip", () => {
         throw new SyntaxError("Unexpected token");
       },
     })) as unknown as typeof fetch;
-    await runExtraction(engine, { llmPrefix: "x", fetchFn: fn });
+    await runServerVerb(engine, { llmUrl: "x", fetchFn: fn });
     expect(engine.currentStepId).toBe("filing_status");
   });
 
@@ -337,22 +343,22 @@ describe("runExtraction — the fetch round-trip", () => {
         );
       })) as unknown as typeof fetch;
 
-    await runExtraction(engine, {
-      llmPrefix: "x",
+    await runServerVerb(engine, {
+      llmUrl: "x",
       timeoutMs: 5,
       fetchFn: hangingFetch,
     });
     expect(engine.currentStepId).toBe("filing_status");
   });
 
-  it("falls back immediately when no llmPrefix is configured (no fetch)", async () => {
+  it("falls back immediately when no llmUrl is configured (no fetch)", async () => {
     const engine = atExtractStep();
     let called = false;
     const fn = (async () => {
       called = true;
       return { ok: true, status: 200, json: async () => ({}) } as Response;
     }) as unknown as typeof fetch;
-    await runExtraction(engine, { llmPrefix: "", fetchFn: fn });
+    await runServerVerb(engine, { llmUrl: "", fetchFn: fn });
     expect(called).toBe(false);
     expect(engine.currentStepId).toBe("filing_status");
   });
@@ -364,7 +370,7 @@ describe("runExtraction — the fetch round-trip", () => {
       called = true;
       return { ok: true, status: 200, json: async () => ({}) } as Response;
     }) as unknown as typeof fetch;
-    await runExtraction(engine, { llmPrefix: "x", fetchFn: fn });
+    await runServerVerb(engine, { llmUrl: "x", fetchFn: fn });
     expect(called).toBe(false);
     expect(engine.currentStepId).toBe("describe");
   });

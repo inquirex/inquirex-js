@@ -88,16 +88,26 @@ export interface StepDefinition {
 }
 
 /** Visual theme overrides. Each field maps 1:1 to a CSS custom property
- *  on the widget's shadow root. All fields optional. */
+ *  on the widget's shadow root. All fields optional.
+ *
+ *  Every one of these can also be set directly from the host page's CSS by
+ *  targeting the element — e.g. `inquirex-widget { --iq-radius: 0; }` — because
+ *  custom properties inherit through the shadow boundary. Values supplied here
+ *  (or in the flow's `meta.theme`) are applied as inline style and therefore
+ *  win over host-page stylesheet rules. Precedence, lowest to highest:
+ *  built-in defaults < host-page CSS < this object / flow theme. */
 export interface ThemeOverrides {
-  /** Primary accent color (bubble, buttons, answer bubbles). */
+  // ── Brand ──
+  /** Primary accent color (launcher, buttons, answer bubbles). */
   brand?: string;
   /** Text/icon color shown *on top of* the brand color.
    *  Auto-computed from brand luminance if omitted. */
   onBrand?: string;
-  /** Panel background color. */
+
+  // ── Surfaces ──
+  /** Chat-window (panel) background color. */
   background?: string;
-  /** Message bubble & input background. */
+  /** Input & bubble surface background. */
   surface?: string;
   /** Primary text color. */
   text?: string;
@@ -105,12 +115,100 @@ export interface ThemeOverrides {
   textMuted?: string;
   /** Border color for inputs and dividers. */
   border?: string;
-  /** Corner radius for the panel (e.g. "18px"). */
+
+  // ── Header ──
+  /** Header background — a solid color or any CSS `background` value
+   *  (defaults to a brand gradient). */
+  headerBg?: string;
+  /** Header text/icon color (defaults to `onBrand`). */
+  headerText?: string;
+  /** Header title font size, e.g. "18px". */
+  headerFontSize?: string;
+
+  // ── Form widgets ──
+  /** Selection / focus accent for the form widgets — radios, checkboxes,
+   *  inputs (defaults to `brand`). */
+  highlight?: string;
+
+  // ── Chat bubbles ──
+  /** Question-bubble background (defaults to `surface`). */
+  bubbleQuestionBg?: string;
+  /** Question-bubble text color (defaults to `text`). */
+  bubbleQuestionText?: string;
+  /** Answer-bubble background (defaults to `brand`). */
+  bubbleAnswerBg?: string;
+  /** Answer-bubble text color (defaults to `onBrand`). */
+  bubbleAnswerText?: string;
+
+  // ── Launcher ──
+  /** Floating launcher button background (defaults to `brand`). */
+  launcherBg?: string;
+  /** Floating launcher icon color (defaults to `onBrand`). */
+  launcherIcon?: string;
+
+  // ── Geometry & type ──
+  /** Corner radius for the panel & launcher, e.g. "18px" (use "0" for square). */
   radius?: string;
+  /** Inner padding of the conversation area, e.g. "16px". */
+  padding?: string;
   /** Body font family. */
   font?: string;
   /** Header font family (defaults to body font). */
   headerFont?: string;
+}
+
+/** How the copilot first opens. */
+export type TriggerMode =
+  /** Stay collapsed until the visitor clicks the launcher (default). */
+  | "click"
+  /** Open automatically as soon as the widget loads. */
+  | "auto"
+  /** Open automatically after `triggerDelay` ms. */
+  | "delay";
+
+/** Which screen corner the widget anchors to. */
+export type WidgetPosition = "bottom-right" | "bottom-left";
+
+/**
+ * The complete embedder-facing configuration. Every field is optional; the
+ * widget resolves a value for each from (highest precedence first):
+ *   1. an explicit {@link mount} argument,
+ *   2. `data-inquirex-*` attributes on the loading `<script>`,
+ *   3. a `window.InquirexConfig` global,
+ *   4. a build-time baked config (qualified.at per-form bundle),
+ *   5. built-in defaults.
+ * See `src/config.ts`.
+ */
+export interface InquirexConfig {
+  /** GET the flow definition JSON here. Also the POST target for completed
+   *  answers unless {@link submitUrl} is set. (`data-inquirex-url`) */
+  url?: string;
+  /** Inline flow definition — skips the GET entirely. (`data-inquirex-json`,
+   *  passed as a JSON string; or a parsed object programmatically.) */
+  json?: string | FlowDefinition;
+  /** Convenience: derive `url` from a qualified.at site id. (`data-inquirex-site-id`) */
+  siteId?: string;
+  /** POST completed answers here. Falls back to {@link url}. (`data-inquirex-submit-to`) */
+  submitUrl?: string;
+  /** POST LLM verbs (`extract`, …) here. Omit to disable LLM steps — they then
+   *  degrade to plain form questions. (`data-inquirex-llm-url`) */
+  llmUrl?: string;
+  /** Client timeout (ms) for one LLM round-trip before falling back.
+   *  (`data-inquirex-llm-timeout`, default 20000) */
+  llmTimeout?: number;
+  /** Opaque, server-signed token forwarded on every request as
+   *  `Authorization: Bearer <token>`. The server binds it to the embedding
+   *  origin + form and verifies it; the widget never computes it.
+   *  (`data-inquirex-auth`; also read from the flow's `session.token`.) */
+  auth?: string;
+  /** How the copilot first opens. (`data-inquirex-trigger`, default "click") */
+  trigger?: TriggerMode;
+  /** Delay in ms when `trigger` is "delay". (`data-inquirex-trigger-delay`, default 1000) */
+  triggerDelay?: number;
+  /** Screen corner to anchor to. (`data-inquirex-position`, default "bottom-right") */
+  position?: WidgetPosition;
+  /** Visual theme overrides (also settable via the flow's `meta.theme` or host CSS). */
+  theme?: ThemeOverrides;
 }
 
 /** Top-level flow definition — the JSON wire format contract. */
