@@ -3,12 +3,13 @@ import { customElement, property, state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { FlowEngine } from "./engine.js";
 import { runExtraction } from "./extract-client.js";
-import { applyTheme } from "./theme.js";
+import { applyTheme, applyThemeOverrides } from "./theme.js";
 import type {
   FlowDefinition,
   StepDefinition,
   HistoryEntry,
   Option,
+  ThemeOverrides,
 } from "./types.js";
 
 // Register sub-components (side-effect imports)
@@ -38,6 +39,7 @@ export class InquirexWidget extends LitElement {
     :host {
       --iq-brand: #2563eb;
       --iq-brand-dark: color-mix(in srgb, var(--iq-brand) 85%, #000);
+      --iq-highlight: var(--iq-brand);
       --iq-on-brand: #ffffff;
       --iq-bg: #f8f7f4;
       --iq-surface: #ffffff;
@@ -46,29 +48,54 @@ export class InquirexWidget extends LitElement {
       --iq-border: #e7e5e4;
       --iq-radius: 18px;
       --iq-font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --iq-font-size: 15px;
       --iq-header-font: var(--iq-font);
+      --iq-header-font-size: 18px;
+      --iq-header-bg: linear-gradient(135deg, var(--iq-brand), var(--iq-brand-dark));
+      --iq-header-text: var(--iq-on-brand);
+      --iq-question-bg: var(--iq-surface);
+      --iq-question-text: var(--iq-text);
+      --iq-answer-bg: var(--iq-brand);
+      --iq-answer-text: var(--iq-on-brand);
+      --iq-padding: 16px;
+      --iq-trigger-bg: var(--iq-brand);
+      --iq-trigger-text: var(--iq-on-brand);
+      --iq-trigger-radius: 50%;
+      --iq-trigger-size: 60px;
+      --iq-widget-offset-block: 24px;
+      --iq-widget-offset-inline: 24px;
+      --iq-panel-width: 400px;
+      --iq-panel-max-height: 620px;
 
       font-family: var(--iq-font);
-      font-size: 15px;
+      font-size: var(--iq-font-size);
       line-height: 1.5;
       color: var(--iq-text);
       position: fixed;
-      bottom: 24px;
-      right: 24px;
+      bottom: var(--iq-widget-offset-block);
+      right: var(--iq-widget-offset-inline);
       z-index: 99999;
+    }
+    :host([position="bottom-left"]) {
+      left: var(--iq-widget-offset-inline);
+      right: auto;
+    }
+    :host([position="bottom-right"]) {
+      left: auto;
+      right: var(--iq-widget-offset-inline);
     }
 
     /* ── Floating trigger bubble ── */
     .bubble {
-      width: 60px; height: 60px;
-      border-radius: 50%;
-      background: var(--iq-brand);
-      color: var(--iq-on-brand);
+      width: var(--iq-trigger-size); height: var(--iq-trigger-size);
+      border-radius: var(--iq-trigger-radius);
+      background: var(--iq-trigger-bg);
+      color: var(--iq-trigger-text);
       border: none;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       box-shadow:
-        0 4px 20px color-mix(in srgb, var(--iq-brand) 35%, transparent),
+        0 4px 20px color-mix(in srgb, var(--iq-trigger-bg) 35%, transparent),
         0 2px 8px rgba(0,0,0,0.08);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       position: relative;
@@ -76,7 +103,7 @@ export class InquirexWidget extends LitElement {
     .bubble:hover {
       transform: scale(1.08);
       box-shadow:
-        0 6px 28px color-mix(in srgb, var(--iq-brand) 45%, transparent),
+        0 6px 28px color-mix(in srgb, var(--iq-trigger-bg) 45%, transparent),
         0 2px 8px rgba(0,0,0,0.1);
     }
     .bubble:active { transform: scale(0.95); }
@@ -84,7 +111,7 @@ export class InquirexWidget extends LitElement {
       content: '';
       position: absolute; inset: -4px;
       border-radius: 50%;
-      border: 2px solid var(--iq-brand);
+      border: 2px solid var(--iq-trigger-bg);
       animation: pulse 2s ease-out infinite;
     }
     @keyframes pulse {
@@ -95,9 +122,9 @@ export class InquirexWidget extends LitElement {
     /* ── Panel container ── */
     .panel {
       position: absolute;
-      bottom: 72px; right: 0;
-      width: 400px;
-      max-height: 620px;
+      bottom: calc(var(--iq-trigger-size) + 12px); right: 0;
+      width: var(--iq-panel-width);
+      max-height: var(--iq-panel-max-height);
       background: var(--iq-bg);
       border-radius: var(--iq-radius);
       box-shadow:
@@ -108,6 +135,11 @@ export class InquirexWidget extends LitElement {
       overflow: hidden;
       transform-origin: bottom right;
       animation: panelIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    :host([position="bottom-left"]) .panel {
+      left: 0;
+      right: auto;
+      transform-origin: bottom left;
     }
     .panel.closing {
       animation: panelOut 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
@@ -123,8 +155,8 @@ export class InquirexWidget extends LitElement {
 
     /* ── Header ── */
     .header {
-      background: linear-gradient(135deg, var(--iq-brand), var(--iq-brand-dark));
-      color: var(--iq-on-brand);
+      background: var(--iq-header-bg);
+      color: var(--iq-header-text);
       padding: 20px 20px 18px;
       position: relative;
       display: flex;
@@ -136,7 +168,7 @@ export class InquirexWidget extends LitElement {
       width: 60px; height: 60px;
       border-radius: 10px;
       overflow: hidden;
-      background: color-mix(in srgb, var(--iq-on-brand) 12%, transparent);
+      background: color-mix(in srgb, var(--iq-header-text) 12%, transparent);
       display: flex; align-items: center; justify-content: center;
     }
     .header-logo img {
@@ -147,7 +179,7 @@ export class InquirexWidget extends LitElement {
     .header-text { flex: 1; min-width: 0; padding-right: 72px; }
     .header-title {
       font-family: var(--iq-header-font);
-      font-size: 18px; font-weight: 700;
+      font-size: var(--iq-header-font-size); font-weight: 700;
       margin: 0 0 2px;
       letter-spacing: -0.01em;
     }
@@ -158,28 +190,28 @@ export class InquirexWidget extends LitElement {
     }
     .close-btn {
       position: absolute; top: 14px; right: 14px;
-      background: color-mix(in srgb, var(--iq-on-brand) 18%, transparent);
-      border: none; color: var(--iq-on-brand);
+      background: color-mix(in srgb, var(--iq-header-text) 18%, transparent);
+      border: none; color: var(--iq-header-text);
       width: 32px; height: 32px;
       border-radius: 8px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s;
     }
-    .close-btn:hover { background: color-mix(in srgb, var(--iq-on-brand) 30%, transparent); }
+    .close-btn:hover { background: color-mix(in srgb, var(--iq-header-text) 30%, transparent); }
 
     /* ── Debug button (dev only, sits next to the X) ── */
     .debug-btn {
       position: absolute; top: 14px; right: 54px;
-      background: color-mix(in srgb, var(--iq-on-brand) 18%, transparent);
-      border: none; color: var(--iq-on-brand);
+      background: color-mix(in srgb, var(--iq-header-text) 18%, transparent);
+      border: none; color: var(--iq-header-text);
       width: 32px; height: 32px;
       border-radius: 8px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, transform 0.1s;
     }
-    .debug-btn:hover { background: color-mix(in srgb, var(--iq-on-brand) 30%, transparent); }
+    .debug-btn:hover { background: color-mix(in srgb, var(--iq-header-text) 30%, transparent); }
     .debug-btn:active { transform: scale(0.92); }
 
     /* ── Debug panel (dev only — Ayu Dark inspired JSON inspector) ── */
@@ -270,7 +302,7 @@ export class InquirexWidget extends LitElement {
     .conversation {
       flex: 1;
       overflow-y: auto;
-      padding: 16px 16px 8px;
+      padding: var(--iq-padding) var(--iq-padding) 8px;
       display: flex; flex-direction: column; gap: 12px;
       scroll-behavior: smooth;
     }
@@ -284,7 +316,8 @@ export class InquirexWidget extends LitElement {
       to   { opacity: 1; transform: translateY(0); }
     }
     .bubble-q {
-      background: var(--iq-surface);
+      background: var(--iq-question-bg);
+      color: var(--iq-question-text);
       padding: 12px 16px;
       border-radius: 14px 14px 14px 4px;
       font-size: 15px;
@@ -292,8 +325,8 @@ export class InquirexWidget extends LitElement {
       box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
     .bubble-a {
-      background: var(--iq-brand);
-      color: var(--iq-on-brand);
+      background: var(--iq-answer-bg);
+      color: var(--iq-answer-text);
       padding: 10px 16px;
       border-radius: 14px 14px 4px 14px;
       font-size: 14px;
@@ -311,7 +344,7 @@ export class InquirexWidget extends LitElement {
     }
     .msg-btw .bubble-q {
       background: color-mix(in srgb, var(--iq-brand) 6%, var(--iq-surface));
-      border-left: 3px solid var(--iq-brand);
+      border-left: 3px solid var(--iq-highlight);
       border-radius: 4px 14px 14px 4px;
     }
     .msg-warning .bubble-q {
@@ -336,15 +369,15 @@ export class InquirexWidget extends LitElement {
     .submit-btn {
       width: 42px; height: 42px;
       border-radius: 10px;
-      background: var(--iq-brand);
-      color: var(--iq-on-brand);
+      background: var(--iq-answer-bg);
+      color: var(--iq-answer-text);
       border: none;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
       transition: background 0.15s, transform 0.1s;
     }
-    .submit-btn:hover { background: var(--iq-brand-dark); }
+    .submit-btn:hover { filter: brightness(0.95); }
     .submit-btn:active { transform: scale(0.93); }
     .submit-btn:disabled {
       opacity: 0.4; cursor: default;
@@ -355,8 +388,8 @@ export class InquirexWidget extends LitElement {
       width: 100%;
       padding: 12px;
       border-radius: 10px;
-      background: var(--iq-brand);
-      color: var(--iq-on-brand);
+      background: var(--iq-answer-bg);
+      color: var(--iq-answer-text);
       border: none;
       font-family: inherit;
       font-size: 15px;
@@ -364,7 +397,7 @@ export class InquirexWidget extends LitElement {
       cursor: pointer;
       transition: background 0.15s, transform 0.1s;
     }
-    .continue-btn:hover { background: var(--iq-brand-dark); }
+    .continue-btn:hover { filter: brightness(0.95); }
     .continue-btn:active { transform: scale(0.98); }
 
     /* ── Completion ── */
@@ -375,10 +408,10 @@ export class InquirexWidget extends LitElement {
     .complete-icon {
       width: 56px; height: 56px;
       border-radius: 50%;
-      background: color-mix(in srgb, var(--iq-brand) 10%, var(--iq-bg));
+      background: color-mix(in srgb, var(--iq-highlight) 10%, var(--iq-bg));
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto 12px;
-      color: var(--iq-brand);
+      color: var(--iq-highlight);
     }
     .complete-text { font-size: 14px; color: var(--iq-text-muted); }
 
@@ -408,7 +441,7 @@ export class InquirexWidget extends LitElement {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: var(--iq-brand);
+      background: var(--iq-highlight);
       opacity: 0.4;
       animation: iqThinking 1.2s infinite ease-in-out both;
     }
@@ -430,15 +463,37 @@ export class InquirexWidget extends LitElement {
   /** URL to fetch the flow definition JSON. */
   @property({ attribute: "flow-url" }) flowUrl = "";
 
+  /** URL that receives the completed answers JSON. Defaults to flow-url. */
+  @property({ attribute: "submit-url" }) submitUrl = "";
+
   /** Inline JSON string (alternative to flow-url). */
   @property({ attribute: "flow-json" }) flowJson = "";
 
-  /** URL prefix for LLM server verbs. `extract` steps POST to `{prefix}/extract`.
-   *  When empty, `extract` steps degrade to the manual-form fallback. */
+  /** Exact URL for server/LLM verbs. Preferred for new embeds. The widget
+   *  appends `?verb=extract&inquirex_dsl={flow-url}` and POSTs data-only JSON. */
+  @property({ attribute: "flow-llm-url" }) llmUrl = "";
+
+  /** URL prefix for legacy LLM server verbs. `extract` steps POST to
+   *  `{prefix}/extract`. When empty, server verbs degrade to the manual-form
+   *  fallback. */
   @property({ attribute: "flow-llm-prefix" }) llmPrefix = "";
 
   /** Client timeout (ms) for an `extract` round-trip before falling back. */
   @property({ attribute: "flow-llm-timeout", type: Number }) llmTimeout = 20000;
+
+  /** Where the launcher sits on desktop viewports. */
+  @property({ reflect: true }) position: "bottom-right" | "bottom-left" =
+    "bottom-right";
+
+  /** Launch behavior: `click` shows the launcher only, `open` opens
+   *  immediately, and `delay` opens after `open-delay` ms. */
+  @property({ attribute: "launch-mode" }) launchMode:
+    | "click"
+    | "open"
+    | "delay" = "click";
+
+  /** Delay in ms for `launch-mode="delay"`. */
+  @property({ attribute: "open-delay", type: Number }) openDelay = 1000;
 
   @state() private open = false;
   @state() private engine: FlowEngine | null = null;
@@ -459,6 +514,18 @@ export class InquirexWidget extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.loadDefinition();
+    this.scheduleInitialOpen();
+  }
+
+  private scheduleInitialOpen() {
+    if (this.launchMode === "click") return;
+
+    const delay = this.launchMode === "delay" ? Math.max(0, this.openDelay) : 0;
+    window.setTimeout(() => {
+      this.pulsed = false;
+      this.open = true;
+      this.updateComplete.then(() => this.scrollToBottom());
+    }, delay);
   }
 
   private async loadDefinition() {
@@ -835,7 +902,9 @@ export class InquirexWidget extends LitElement {
     while (!engine.finished && engine.currentStepIsExtract) {
       this.afterAdvance(); // show the thinking spinner
       await runExtraction(engine, {
+        llmUrl: this.llmUrl,
         llmPrefix: this.llmPrefix,
+        dslUrl: this.flowUrl,
         sessionToken: this.sessionToken,
         timeoutMs: this.llmTimeout,
       });
@@ -881,10 +950,11 @@ export class InquirexWidget extends LitElement {
   private async autoSubmitIfComplete() {
     const engine = this.engine;
     if (!engine?.finished) return;
-    if (this.submitted || !this.flowUrl) return;
+    const postUrl = this.submitUrl || this.flowUrl;
+    if (this.submitted || !postUrl) return;
 
     try {
-      const res = await fetch(this.flowUrl, {
+      const res = await fetch(postUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(engine.toResult()),
@@ -927,15 +997,34 @@ export class InquirexWidget extends LitElement {
 
 /* ── Auto-init from <script> tag attributes ── */
 
-function autoInit() {
-  const script = document.currentScript as HTMLScriptElement | null;
+function autoInit(script: HTMLScriptElement | null) {
   if (!script) return;
 
-  const flowUrl = script.getAttribute("data-flow-url");
-  const flowJson = script.getAttribute("data-flow-json");
+  const flowUrl =
+    script.getAttribute("data-inquirex-dsl") ??
+    script.getAttribute("data-flow-url");
+  const submitUrl =
+    script.getAttribute("data-inquirex-submit-to") ??
+    script.getAttribute("data-submit-url");
+  const flowJson =
+    script.getAttribute("data-inquirex-flow-json") ??
+    script.getAttribute("data-flow-json");
   const siteId = script.getAttribute("data-site-id");
+  const llmUrl =
+    script.getAttribute("data-inquirex-llm-url") ??
+    script.getAttribute("data-flow-llm-url");
   const llmPrefix = script.getAttribute("data-flow-llm-prefix");
-  const llmTimeout = script.getAttribute("data-flow-llm-timeout");
+  const llmTimeout =
+    script.getAttribute("data-inquirex-llm-timeout") ??
+    script.getAttribute("data-flow-llm-timeout");
+  const position = script.getAttribute("data-inquirex-position");
+  const launchMode =
+    script.getAttribute("data-inquirex-launch") ??
+    script.getAttribute("data-launch-mode");
+  const openDelay =
+    script.getAttribute("data-inquirex-open-delay") ??
+    script.getAttribute("data-open-delay");
+  const themeJson = script.getAttribute("data-inquirex-theme");
 
   if (!flowUrl && !flowJson && !siteId) return;
 
@@ -943,16 +1032,43 @@ function autoInit() {
   if (flowUrl) widget.setAttribute("flow-url", flowUrl);
   else if (siteId)
     widget.setAttribute("flow-url", `https://qualified.at/api/flows/${siteId}`);
+  if (submitUrl) widget.setAttribute("submit-url", submitUrl);
   if (flowJson) widget.setAttribute("flow-json", flowJson);
+  if (llmUrl) widget.setAttribute("flow-llm-url", llmUrl);
   if (llmPrefix) widget.setAttribute("flow-llm-prefix", llmPrefix);
   if (llmTimeout) widget.setAttribute("flow-llm-timeout", llmTimeout);
+  if (position === "bottom-left" || position === "bottom-right") {
+    widget.setAttribute("position", position);
+  }
+  if (launchMode === "click" || launchMode === "open" || launchMode === "delay") {
+    widget.setAttribute("launch-mode", launchMode);
+  }
+  if (openDelay) widget.setAttribute("open-delay", openDelay);
+  applyScriptTheme(widget, themeJson);
   document.body.appendChild(widget);
 }
 
+function applyScriptTheme(widget: HTMLElement, rawTheme: string | null) {
+  if (!rawTheme) return;
+
+  try {
+    const parsed = JSON.parse(rawTheme) as
+      | Partial<ThemeOverrides>
+      | Record<string, unknown>;
+    if (parsed && typeof parsed === "object") {
+      applyThemeOverrides(widget, parsed);
+    }
+  } catch {
+    // Theme parsing is non-critical. A malformed data attribute should not
+    // prevent the questionnaire from loading.
+  }
+}
+
+const autoInitScript = document.currentScript as HTMLScriptElement | null;
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", autoInit);
+  document.addEventListener("DOMContentLoaded", () => autoInit(autoInitScript));
 } else {
-  autoInit();
+  autoInit(autoInitScript);
 }
 
 declare global {

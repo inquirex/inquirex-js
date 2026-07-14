@@ -1,8 +1,9 @@
 import type { FlowDefinition, ThemeOverrides } from "./types.js";
 
 /** Map theme keys to their CSS custom properties. */
-const THEME_VAR_MAP: Record<keyof ThemeOverrides, string> = {
+export const THEME_VAR_MAP: Record<keyof ThemeOverrides, string> = {
   brand: "--iq-brand",
+  highlight: "--iq-highlight",
   onBrand: "--iq-on-brand",
   background: "--iq-bg",
   surface: "--iq-surface",
@@ -11,7 +12,19 @@ const THEME_VAR_MAP: Record<keyof ThemeOverrides, string> = {
   border: "--iq-border",
   radius: "--iq-radius",
   font: "--iq-font",
+  fontSize: "--iq-font-size",
   headerFont: "--iq-header-font",
+  headerFontSize: "--iq-header-font-size",
+  headerBackground: "--iq-header-bg",
+  headerText: "--iq-header-text",
+  questionBubbleBackground: "--iq-question-bg",
+  questionBubbleText: "--iq-question-text",
+  answerBubbleBackground: "--iq-answer-bg",
+  answerBubbleText: "--iq-answer-text",
+  padding: "--iq-padding",
+  triggerBackground: "--iq-trigger-bg",
+  triggerText: "--iq-trigger-text",
+  triggerRadius: "--iq-trigger-radius",
 };
 
 /** Default font stack we append to user-provided font values, so that
@@ -61,7 +74,14 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
 export function applyTheme(el: HTMLElement, def: FlowDefinition): void {
   const theme = def.meta?.theme;
   if (!theme) return;
+  applyThemeOverrides(el, theme);
+}
 
+/** Apply theme keys or raw --iq-* custom properties directly to an element. */
+export function applyThemeOverrides(
+  el: HTMLElement,
+  theme: Partial<ThemeOverrides> | Record<string, unknown>,
+): void {
   const brand = sanitize(theme.brand);
   if (brand) {
     el.style.setProperty("--iq-brand", brand);
@@ -74,7 +94,9 @@ export function applyTheme(el: HTMLElement, def: FlowDefinition): void {
   for (const [key, raw] of Object.entries(theme)) {
     const value = sanitize(raw);
     if (!value) continue;
-    const cssVar = THEME_VAR_MAP[key as keyof ThemeOverrides];
+    const cssVar = key.startsWith("--iq-")
+      ? key
+      : THEME_VAR_MAP[key as keyof ThemeOverrides];
     if (!cssVar) continue;
     // For font stacks, append the widget's fallback so unavailable user
     // fonts degrade to Outfit / system fonts rather than generic sans-serif.

@@ -92,6 +92,8 @@ export interface StepDefinition {
 export interface ThemeOverrides {
   /** Primary accent color (bubble, buttons, answer bubbles). */
   brand?: string;
+  /** Highlight color for focused/selected form controls. Defaults to brand. */
+  highlight?: string;
   /** Text/icon color shown *on top of* the brand color.
    *  Auto-computed from brand luminance if omitted. */
   onBrand?: string;
@@ -109,8 +111,32 @@ export interface ThemeOverrides {
   radius?: string;
   /** Body font family. */
   font?: string;
+  /** Base font size for the widget (e.g. "15px"). */
+  fontSize?: string;
   /** Header font family (defaults to body font). */
   headerFont?: string;
+  /** Header title font size (e.g. "18px"). */
+  headerFontSize?: string;
+  /** Header background. Accepts a color or CSS gradient. */
+  headerBackground?: string;
+  /** Header text/icon color. */
+  headerText?: string;
+  /** Question bubble background. */
+  questionBubbleBackground?: string;
+  /** Question bubble foreground. */
+  questionBubbleText?: string;
+  /** Answer bubble background. */
+  answerBubbleBackground?: string;
+  /** Answer bubble foreground. */
+  answerBubbleText?: string;
+  /** Main conversation area padding. */
+  padding?: string;
+  /** Floating launcher background. */
+  triggerBackground?: string;
+  /** Floating launcher foreground. */
+  triggerText?: string;
+  /** Floating launcher border radius. Use "50%" for circular. */
+  triggerRadius?: string;
 }
 
 /** Top-level flow definition — the JSON wire format contract. */

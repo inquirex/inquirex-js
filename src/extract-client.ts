@@ -2,8 +2,17 @@ import type { FlowEngine } from "./engine.js";
 
 /** Configuration for a single `extract` round-trip. */
 export interface ExtractConfig {
-  /** URL prefix; the request goes to `{llmPrefix}/extract`. */
-  llmPrefix: string;
+  /** Exact endpoint for server-side verbs. The request goes here as-is, with
+   *  `verb` and the DSL URL appended as query parameters. Preferred for new
+   *  embeds because one endpoint can handle `extract`, `classify`, etc. */
+  llmUrl?: string;
+  /** Legacy URL prefix; the request goes to `{llmPrefix}/extract`. */
+  llmPrefix?: string;
+  /** URL the widget used to fetch the source DSL. Sent as a query parameter
+   *  with `llmUrl` so the backend can reload the canonical definition. */
+  dslUrl?: string;
+  /** Query parameter name used for `dslUrl`. */
+  dslUrlParam?: string;
   /** Opaque server-issued session token, sent as a bearer credential. */
   sessionToken?: string;
   /** Client timeout in ms before aborting and falling back. */
@@ -32,7 +41,8 @@ export async function runExtraction(
   if (!engine.currentStepIsExtract) return;
 
   // No endpoint configured → immediate graceful fallback.
-  if (!cfg.llmPrefix) {
+  const requestUrl = buildServerVerbUrl(engine.currentStep.verb, cfg);
+  if (!requestUrl) {
     engine.failExtraction();
     return;
   }
@@ -43,7 +53,7 @@ export async function runExtraction(
   const timer = setTimeout(() => controller.abort(), cfg.timeoutMs ?? 20000);
 
   try {
-    const res = await doFetch(`${cfg.llmPrefix.replace(/\/+$/, "")}/extract`, {
+    const res = await doFetch(requestUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -54,6 +64,7 @@ export async function runExtraction(
       body: JSON.stringify({
         flow_id: engine.definition.id,
         version: engine.definition.version,
+        verb: engine.currentStep.verb,
         step: stepId,
         answers: { ...engine.answers },
       }),
@@ -66,4 +77,28 @@ export async function runExtraction(
   } finally {
     clearTimeout(timer);
   }
+}
+
+function buildServerVerbUrl(
+  verb: string,
+  cfg: ExtractConfig,
+): string | null {
+  if (cfg.llmUrl) {
+    const base =
+      typeof globalThis.location === "object" && globalThis.location?.href
+        ? globalThis.location.href
+        : "http://localhost/";
+    const url = new URL(cfg.llmUrl, base);
+    url.searchParams.set("verb", verb);
+    if (cfg.dslUrl) {
+      url.searchParams.set(cfg.dslUrlParam ?? "inquirex_dsl", cfg.dslUrl);
+    }
+    return url.toString();
+  }
+
+  if (cfg.llmPrefix) {
+    return `${cfg.llmPrefix.replace(/\/+$/, "")}/extract`;
+  }
+
+  return null;
 }

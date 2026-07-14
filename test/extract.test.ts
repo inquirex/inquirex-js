@@ -264,6 +264,7 @@ describe("runExtraction — the fetch round-trip", () => {
     expect(body).toEqual({
       flow_id: "tax-llm",
       version: "1.0.0",
+      verb: "extract",
       step: "extracted",
       answers: { describe: expect.any(String) },
     });
@@ -272,6 +273,35 @@ describe("runExtraction — the fetch round-trip", () => {
     expect(body).not.toHaveProperty("llm");
     const headers = calls[0].init.headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer tok-123");
+  });
+
+  it("posts to an exact server verb URL with verb and DSL query parameters", async () => {
+    const engine = atExtractStep();
+    const { fn, calls } = jsonFetch({
+      status: "ok",
+      answers: {},
+      next: "filing_status",
+    });
+
+    await runExtraction(engine, {
+      llmUrl: "https://api.example.com/inquirex/llm?site=demo",
+      dslUrl: "https://example.com/inquirex/form.json",
+      fetchFn: fn,
+    });
+
+    expect(calls).toHaveLength(1);
+    const url = new URL(calls[0].url);
+    expect(url.origin + url.pathname).toBe(
+      "https://api.example.com/inquirex/llm",
+    );
+    expect(url.searchParams.get("site")).toBe("demo");
+    expect(url.searchParams.get("verb")).toBe("extract");
+    expect(url.searchParams.get("inquirex_dsl")).toBe(
+      "https://example.com/inquirex/form.json",
+    );
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body.verb).toBe("extract");
+    expect(body.step).toBe("extracted");
   });
 
   it("omits the Authorization header when no token is set", async () => {

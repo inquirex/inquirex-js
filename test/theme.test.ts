@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { contrastColor, darken, applyTheme } from "../src/theme.js";
+import {
+  contrastColor,
+  darken,
+  applyTheme,
+  applyThemeOverrides,
+} from "../src/theme.js";
 import type { FlowDefinition } from "../src/types.js";
 
 describe("contrastColor", () => {
@@ -119,6 +124,19 @@ describe("applyTheme", () => {
           textMuted: "#aaa",
           border: "#444",
           radius: "8px",
+          highlight: "#f97316",
+          fontSize: "16px",
+          headerFontSize: "20px",
+          headerBackground: "#111827",
+          headerText: "#f9fafb",
+          questionBubbleBackground: "#f8fafc",
+          questionBubbleText: "#0f172a",
+          answerBubbleBackground: "#14532d",
+          answerBubbleText: "#dcfce7",
+          padding: "20px",
+          triggerBackground: "#111827",
+          triggerText: "#f9fafb",
+          triggerRadius: "12px",
         },
       }),
     );
@@ -128,6 +146,19 @@ describe("applyTheme", () => {
     expect(el.style.getPropertyValue("--iq-text-muted")).toBe("#aaa");
     expect(el.style.getPropertyValue("--iq-border")).toBe("#444");
     expect(el.style.getPropertyValue("--iq-radius")).toBe("8px");
+    expect(el.style.getPropertyValue("--iq-highlight")).toBe("#f97316");
+    expect(el.style.getPropertyValue("--iq-font-size")).toBe("16px");
+    expect(el.style.getPropertyValue("--iq-header-font-size")).toBe("20px");
+    expect(el.style.getPropertyValue("--iq-header-bg")).toBe("#111827");
+    expect(el.style.getPropertyValue("--iq-header-text")).toBe("#f9fafb");
+    expect(el.style.getPropertyValue("--iq-question-bg")).toBe("#f8fafc");
+    expect(el.style.getPropertyValue("--iq-question-text")).toBe("#0f172a");
+    expect(el.style.getPropertyValue("--iq-answer-bg")).toBe("#14532d");
+    expect(el.style.getPropertyValue("--iq-answer-text")).toBe("#dcfce7");
+    expect(el.style.getPropertyValue("--iq-padding")).toBe("20px");
+    expect(el.style.getPropertyValue("--iq-trigger-bg")).toBe("#111827");
+    expect(el.style.getPropertyValue("--iq-trigger-text")).toBe("#f9fafb");
+    expect(el.style.getPropertyValue("--iq-trigger-radius")).toBe("12px");
   });
 
   it("appends widget font fallback to user font stacks", () => {
@@ -168,5 +199,19 @@ describe("applyTheme", () => {
   it("strips multiple trailing semicolons and whitespace", () => {
     applyTheme(el, def({ theme: { radius: "  12px  ;;  " } }));
     expect(el.style.getPropertyValue("--iq-radius")).toBe("12px");
+  });
+
+  it("applies raw --iq-* variables from script theme JSON", () => {
+    applyThemeOverrides(el, {
+      "--iq-header-bg": "linear-gradient(#111, #222)",
+      "--iq-panel-width": "420px",
+      unknown: "#bad",
+    });
+
+    expect(el.style.getPropertyValue("--iq-header-bg")).toBe(
+      "linear-gradient(#111, #222)",
+    );
+    expect(el.style.getPropertyValue("--iq-panel-width")).toBe("420px");
+    expect(el.style.getPropertyValue("unknown")).toBe("");
   });
 });
