@@ -47,6 +47,7 @@ The nested `theme` object merges key-by-key under the same rule.
 | `data-inquirex-llm-url` | `llmUrl` | POST endpoint for LLM verbs. Omit to disable LLM steps. |
 | `data-inquirex-llm-timeout` | `llmTimeout` | Client timeout (ms) per LLM round-trip. Default `20000`. |
 | `data-inquirex-auth` | `auth` | Bearer token forwarded on every request (see [Auth](#authenticating-requests)). |
+| `data-inquirex-origins` | `origins` | Comma-separated origin allowlist; the widget renders nothing elsewhere. Defense-in-depth, not a security boundary. |
 | `data-inquirex-trigger` | `trigger` | `click` \| `auto` \| `delay`. Default `click`. |
 | `data-inquirex-trigger-delay` | `triggerDelay` | ms before auto-open when `trigger="delay"`. Default `1000`. |
 | `data-inquirex-position` | `position` | `bottom-right` \| `bottom-left`. Default `bottom-right`. |

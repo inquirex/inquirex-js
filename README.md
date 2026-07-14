@@ -2,35 +2,116 @@
 
 Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/flowengine-rb/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs the collected answers back to your server.
 
-**53KB** single-file bundle (16KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles completely.
+**53KB** single-file bundle (16KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles **and** markup completely, and every value from the flow definition is rendered as text, never HTML — see [Security](#security).
 
-## Quick Start
+## Three ways to use it
 
-Add one script tag to any page:
+1. **[qualified.at](https://qualified.at) — managed, and by far the easiest.** Design your form in a visual editor, point it at your domain, paste one script tag. The flow JSON, the endpoints, the LLM verbs, the auth token, and the origin lock are all baked into a single minified bundle for you. A free trial gets you live in about ten minutes.
+2. **Self-hosted, deterministic (no LLM).** You provide one URL that answers `GET` (returns your flow as JSON) and `POST` (receives the completed answers). Pure branching runs entirely in the browser — no AI, no keys, no per-request cost.
+3. **Self-hosted, with LLM verbs.** Add one more endpoint that runs the model with *your own* API key. Verbs like `extract` turn a paragraph of free text into structured answers that pre-fill and skip later questions — a 17-question intake can collapse to 3.
+
+All three render the same widget; they differ only in who hosts the pieces.
+
+### 1. qualified.at (managed)
+
+> [!TIP]
+> Register at [qualified.at](https://qualified.at), add your site's domain, author the form, and copy the auto-generated snippet. The library, the form's JSON, the endpoint URLs, the LLM wiring, the auth token, and the origin lock are all compiled into one minified `inquirex-<form-id>.js`. XSS-safe rendering and the domain restriction are automatic — the snippet only runs on the site you registered.
+>
+> ```html
+> <script async
+>   src="https://qualified.at/intake/inquirex-97484e00-61e5-013f-3809-66219a96f4e3.js"></script>
+> ```
+
+Everything below is what qualified.at does *for* you — read on only if you want to host it yourself.
+
+### 2. Self-hosted — deterministic (no LLM)
+
+The simplest integration. Load the bundle (from npm, your own assets, or a CDN) and give it **one URL on your own domain** that answers two methods:
+
+- **`GET`** → returns the flow definition as JSON (the [wire format](#json-wire-format)).
+- **`POST`** → receives the [completed answers](#end-of-the-form-post--receive-completed-answers).
 
 ```html
-<script src="https://qualified.at/inquirex.js"
-        data-inquirex-url="https://your-server.com/api/flows/tax-intake"
-        data-inquirex-llm-url="https://your-server.com/api/llm"></script>
+<script src="https://example.com/assets/inquirex.js"
+        data-inquirex-url="https://example.com/intake"></script>
 ```
 
-That's it. A chat bubble appears in the bottom-right corner. Clicking it opens the questionnaire panel.
+Pure branching (rules, `skip_if`, accumulators) is evaluated client-side, so no server round-trip happens until the final `POST`. No AI endpoint, no API keys.
 
-- **`data-inquirex-url`** — the widget `GET`s the flow definition here and `POST`s
-  the final answers back to the same URL (set `data-inquirex-submit-to` to split
-  the answers POST onto its own endpoint).
-- **`data-inquirex-llm-url`** — optional. The single endpoint where LLM verbs
-  round-trip mid-flow: the widget `POST`s to `{llm-url}?verb=extract&dsl=…` and
-  gets back structured answers that pre-fill (and skip) later questions. Omit it
-  and `extract` steps degrade to a plain form.
+#### Authoring the flow: Ruby DSL → JSON
 
-Full configuration — the `mount()` API, launch/position, theming, auth, and the
-baked per-form bundle — is in **[docs/embedding.md](docs/embedding.md)**.
+Write the form once in the Inquirex Ruby DSL, then convert it to the JSON the widget consumes with the **`inquirex` CLI** (shipped by the [`inquirex-tty`](https://github.com/flowengine-rb) gem):
 
-The widget sends only **data** — flow id, step id, answers-so-far, and a bearer
-session token. Prompts, models, and schemas stay server-side. See
-[docs/extract-protocol.md](docs/extract-protocol.md) for the full wire contract
-and the anti-spoofing design.
+```bash
+gem install inquirex-tty
+
+# Convert a Ruby DSL file to the JSON wire format the widget loads
+inquirex export flow.rb --format json > public/intake.json
+```
+
+> The exact subcommand/flags live in the `inquirex-tty` README; the point is that
+> `definition.to_json` in Ruby and the `inquirex` CLI both emit the same wire
+> format the widget reads. Serve that JSON from your `GET` route — a static file
+> is fine — and you're done.
+
+### 3. Self-hosted — with LLM verbs
+
+Add a **second endpoint** for LLM verbs. When the flow reaches an `extract` step, the widget POSTs to it; your backend calls the model with your key and returns structured fields. Add `data-inquirex-llm-url`:
+
+```html
+<script src="https://example.com/assets/inquirex.js"
+        data-inquirex-url="https://example.com/intake"
+        data-inquirex-llm-url="https://example.com/intake/llm"></script>
+```
+
+#### What your LLM endpoint must do
+
+The widget calls it like this — note it sends **only data**, never a prompt, model, or schema:
+
+```http
+POST https://example.com/intake/llm?verb=extract&dsl=https%3A%2F%2Fexample.com%2Fintake
+Content-Type: application/json
+Authorization: Bearer <token issued in your GET response>
+```
+
+```json
+{
+  "verb": "extract",
+  "flow_id": "tax-intake-2025",
+  "version": "1.0.0",
+  "step": "extract_business_details",
+  "answers": { "describe_your_businesses": "I run two businesses — an influencer channel …" }
+}
+```
+
+Your endpoint is responsible for:
+
+1. **Authenticating** the request (verify the bearer token + `Origin` — see [Security](#security)).
+2. **Resolving the prompt & schema.** Reload your own authoritative flow (by `flow_id`+`version`, or from the `dsl` URL) and look up the server-only `llm` block for `step`. The prompt, model, and expected schema **never leave your server**.
+3. **Calling the model** with *your* API key. Wrap the user's text as clearly-delimited untrusted data (prompt-injection hardening) and constrain output to the schema.
+4. **Validating** each returned field against the schema; drop anything invalid rather than guessing.
+5. **Responding** with the structured answers and the next step:
+
+```json
+{
+  "status": "ok",
+  "answers": { "industry": "Media", "entity_type": "s_corp", "employee_count": 1 },
+  "next": "confirm_details"
+}
+```
+
+`status` is `ok` | `partial` | `error`. The widget merges the returned `answers`
+and jumps to `next`; downstream steps guarded by `skip_if: not_empty(field)`
+auto-skip for every field you filled.
+
+**Reliability guarantee:** any failure — non-2xx, timeout, `status:error`, bad
+JSON, or no `llm-url` configured at all — makes the widget advance and ask those
+questions normally. An LLM outage never breaks the form.
+
+The full wire contract, session-token model, and abuse controls are in
+**[docs/extract-protocol.md](docs/extract-protocol.md)**; the complete
+configuration surface (the `mount()` API, launch, position, theming, the baked
+bundle) is in **[docs/embedding.md](docs/embedding.md)**.
 
 ## How It Works
 
@@ -94,6 +175,7 @@ If the flow declares [accumulators](#accumulators) (e.g. a `:price` running tota
 | `data-inquirex-llm-url` | POST endpoint for LLM verbs (`{llm-url}?verb=extract&dsl=…`). Omit to disable LLM steps |
 | `data-inquirex-llm-timeout` | Client timeout in ms for one LLM call before falling back (default `20000`) |
 | `data-inquirex-auth` | Server-signed bearer token forwarded on every request |
+| `data-inquirex-origins` | Comma-separated origin allowlist; the widget won't run elsewhere ([Security](#security)) |
 | `data-inquirex-trigger` | `click` \| `auto` \| `delay` (default `click`) |
 | `data-inquirex-trigger-delay` | ms before auto-open when `trigger="delay"` (default `1000`) |
 | `data-inquirex-position` | `bottom-right` \| `bottom-left` (default `bottom-right`) |
@@ -125,6 +207,90 @@ prefix):
 <inquirex-widget url="/api/flows/my-flow" llm-url="/api/flows/my-flow/llm">
 </inquirex-widget>
 ```
+
+## Security
+
+Two threat surfaces matter when you drop third-party JavaScript on a page: can
+the widget harm the **host page** (XSS), and can a malicious client abuse **your
+backend** (forged/replayed requests, an open LLM proxy on your bill).
+
+### XSS — protecting the host page
+
+- **Shadow DOM isolation.** The widget renders inside its own shadow root, so its
+  markup and styles never touch — and are never touched by — the host page's DOM
+  or CSS. (Shadow DOM is an *isolation* boundary, not a JS sandbox, but the widget
+  runs no host-supplied code.)
+- **Every dynamic value is rendered as text, not HTML.** All strings from the flow
+  definition — questions, labels, options, `say`/`btw`/`warning` bodies — are
+  interpolated through Lit templates, which set them via `textContent` and escape
+  attribute bindings. A malicious or compromised flow JSON therefore **cannot
+  inject `<script>` or event handlers** into your page. The widget uses no
+  `innerHTML`, `eval`, or `Function` on untrusted content. (The only `unsafeHTML`
+  is the dev-only debug inspector, tree-shaken out of production builds.)
+- **No ambient authority.** The widget reads no cookies, needs no host globals,
+  and makes requests only to the URLs you configure.
+
+### Authenticating requests (frontend → backend)
+
+**Hard truth first:** you cannot authenticate *client code* running in a
+visitor's browser on a third party's page. Any secret shipped in the bundle is
+readable in DevTools, so a SHA computed *in the browser* from a shipped secret
+proves nothing — an attacker reads the secret and reproduces the hash. This is
+true of every embeddable widget.
+
+The version of your instinct that **does** hold moves the hashing to the server
+and binds it to the request's **origin**, which the browser sets and page JS
+cannot forge cross-origin:
+
+1. **Mint server-side, on init.** In your `GET` flow response (or at page render),
+   compute a short-TTL token and return it in the definition's `session` block:
+
+   ```
+   token = HMAC(per_form_secret, origin + form_id + version + exp + nonce)
+   ```
+
+   The secret never leaves your server. This is exactly "hash of the origin +
+   secret, pre-computed and sent when the component initializes" — done where it
+   can't be forged.
+2. **Carry, don't compute.** The widget stores the token opaquely and forwards it
+   as `Authorization: Bearer <token>` on **every** request — the flow `GET`, the
+   answers `POST`, and each LLM `POST`. It computes nothing. (Provide it via
+   `data-inquirex-auth`, or return it as `session.token` in the flow JSON.)
+3. **Verify on every call, server-side:**
+   - recompute the HMAC and constant-time compare → stops forgery;
+   - the request's `Origin`/`Referer` header equals the origin bound in the token
+     and is on your per-site allowlist → stops cross-site embedding (the browser
+     sets `Origin`; page JS can't override it cross-origin);
+   - not expired, `nonce`+`step` not already spent (Redis `SET NX`) → stops replay;
+   - a per-session LLM-call budget (e.g. max 5) → caps the blast radius and your bill.
+
+| Threat | Defended? |
+| --- | --- |
+| Random POSTs running free inference on your key | **Yes** — no valid token, no call |
+| Huge bodies / many calls / expensive model | **Yes** — body cap + per-session budget |
+| Replay of a captured request | **Yes** — one-time `nonce`+`step` |
+| Forged / self-minted tokens | **Yes** — server-only HMAC secret |
+| Embedding on a non-allowlisted domain | **Mostly** — `Origin` check (bypassable only outside a browser, where budget/rate limits bite) |
+
+### Client-side origin lock (defense-in-depth)
+
+As a cheap first gate you can restrict which origins the embed even runs on:
+
+```html
+<script src="https://example.com/assets/inquirex.js"
+        data-inquirex-url="https://example.com/intake"
+        data-inquirex-origins="https://example.com,https://www.example.com"></script>
+```
+
+If the current `location.origin` is not listed, the widget renders nothing and
+makes no requests. This stops a copied script tag from working on someone else's
+site. It is **not** a security boundary (it runs in the browser and is
+defeatable) — it complements, never replaces, the server-side `Origin` check
+above. qualified.at's baked bundle sets this automatically.
+
+Full anti-spoofing design (why HMAC not a keypair, when to add a Turnstile
+challenge, PII handling) is in
+[docs/extract-protocol.md](docs/extract-protocol.md#authenticating-requests-anti-spoofing).
 
 ## CORS Setup
 
@@ -486,7 +652,7 @@ This function mirrors `Inquirex::Accumulation#contribution` in Ruby one-for-one.
 
 ## Theming
 
-The widget's look is driven entirely by CSS custom properties on its shadow root. You don't touch CSS directly — you pass a `theme` object in the flow JSON and each key maps 1:1 to a property.
+The widget's look is driven entirely by CSS custom properties on its shadow root. You can set them from the flow JSON's `theme` object (below), from the embedder config, or straight from your host page's CSS — see the [full variable table in docs/embedding.md](docs/embedding.md#theming), which also covers the header, highlight, bubble, launcher, padding, and radius knobs. Each `theme` key maps 1:1 to a property.
 
 ### Minimal — just a brand color
 
