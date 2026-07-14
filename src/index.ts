@@ -39,6 +39,7 @@ export function createWidget(config: InquirexConfig): InquirexWidget {
   el.llmUrl = config.llmUrl ?? "";
   el.llmTimeout = config.llmTimeout ?? 20000;
   el.auth = config.auth ?? "";
+  el.origins = config.origins ?? [];
   el.trigger = config.trigger ?? "click";
   el.triggerDelay = config.triggerDelay ?? 1000;
   el.position = config.position ?? "bottom-right";

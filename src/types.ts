@@ -201,6 +201,12 @@ export interface InquirexConfig {
    *  origin + form and verifies it; the widget never computes it.
    *  (`data-inquirex-auth`; also read from the flow's `session.token`.) */
   auth?: string;
+  /** Origins this embed is allowed to run on (e.g. `["https://example.com"]`).
+   *  When set, the widget refuses to initialize anywhere else — a cheap guard
+   *  against a copied script tag. NOT a security boundary (it runs in the
+   *  browser); real enforcement is the server's Origin check. Empty = any
+   *  origin. (`data-inquirex-origins`, comma-separated.) */
+  origins?: string[];
   /** How the copilot first opens. (`data-inquirex-trigger`, default "click") */
   trigger?: TriggerMode;
   /** Delay in ms when `trigger` is "delay". (`data-inquirex-trigger-delay`, default 1000) */

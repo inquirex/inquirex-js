@@ -102,6 +102,14 @@ export function readScriptConfig(script: HTMLScriptElement): InquirexConfig {
     auth: attr("auth"),
   };
 
+  const origins = attr("origins");
+  if (origins !== undefined) {
+    cfg.origins = origins
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
+  }
+
   const timeout = attr("llm-timeout");
   if (timeout !== undefined) cfg.llmTimeout = Number(timeout);
 

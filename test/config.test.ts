@@ -45,6 +45,15 @@ describe("readScriptConfig", () => {
     expect(cfg.triggerDelay).toBeUndefined();
   });
 
+  it("parses data-inquirex-origins into a trimmed list", () => {
+    const cfg = readScriptConfig(
+      fakeScript({
+        "data-inquirex-origins": "https://a.com, https://b.com ,",
+      }),
+    );
+    expect(cfg.origins).toEqual(["https://a.com", "https://b.com"]);
+  });
+
   it("parses a data-inquirex-theme JSON object", () => {
     const cfg = readScriptConfig(
       fakeScript({ "data-inquirex-theme": '{"headerBg":"#111","radius":"0"}' }),

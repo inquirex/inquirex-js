@@ -490,6 +490,11 @@ export class InquirexWidget extends LitElement {
    *  answers, POST LLM). Falls back to the flow definition's `session.token`. */
   @property({ attribute: "auth" }) auth = "";
 
+  /** Origins this embed may run on. Empty = any. When set and the current
+   *  `location.origin` is not listed, the widget renders nothing and makes no
+   *  requests. Client-side defense-in-depth, not a security boundary. */
+  @property({ type: Array, attribute: "origins" }) origins: string[] = [];
+
   /** How the copilot first opens: "click" | "auto" | "delay". */
   @property({ attribute: "trigger" }) trigger: TriggerMode = "click";
 
@@ -525,10 +530,26 @@ export class InquirexWidget extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // Refuse to run on a non-allowlisted origin — no fetch, no render.
+    if (!this.originAllowed) {
+      console.warn(
+        `[inquirex] not authorized for origin ${globalThis.location?.origin}; ` +
+          `allowed: ${this.origins.join(", ")}`,
+      );
+      return;
+    }
     this.loadDefinition();
   }
 
+  /** Whether the current page origin is permitted to run this embed. */
+  private get originAllowed(): boolean {
+    if (!this.origins.length) return true;
+    const here = globalThis.location?.origin;
+    return !!here && this.origins.includes(here);
+  }
+
   firstUpdated() {
+    if (!this.originAllowed) return;
     // Apply programmatic theme early so it survives a flow-load failure.
     applyThemeOverrides(this, this.themeOverrides);
     if (this.userInteracted) return;
@@ -576,6 +597,8 @@ export class InquirexWidget extends LitElement {
   }
 
   render() {
+    // Blocked origin → render nothing at all (no launcher, no panel).
+    if (!this.originAllowed) return nothing;
     return html`
       ${this.open ? this.renderPanel() : nothing}
       <button
