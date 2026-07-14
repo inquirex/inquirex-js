@@ -1,3 +1,4 @@
+/.idea
 /coverage
 .vite/
 **/.DS_Store
