@@ -62,11 +62,25 @@ describe("applyTheme", () => {
   let el: HTMLElement;
 
   beforeEach(() => {
-    el = { style: { _map: new Map<string, string>(), setProperty(k: string, v: string) { (this as any)._map.set(k, v); }, getPropertyValue(k: string) { return (this as any)._map.get(k) ?? ""; } } } as unknown as HTMLElement;
+    el = {
+      style: {
+        _map: new Map<string, string>(),
+        setProperty(k: string, v: string) {
+          (this as any)._map.set(k, v);
+        },
+        getPropertyValue(k: string) {
+          return (this as any)._map.get(k) ?? "";
+        },
+      },
+    } as unknown as HTMLElement;
   });
 
   const def = (meta: FlowDefinition["meta"]): FlowDefinition => ({
-    id: "t", version: "1.0.0", start: "a", steps: { a: { verb: "say", text: "hi" } }, meta,
+    id: "t",
+    version: "1.0.0",
+    start: "a",
+    steps: { a: { verb: "say", text: "hi" } },
+    meta,
   });
 
   it("no-ops when meta is absent", () => {
@@ -95,16 +109,19 @@ describe("applyTheme", () => {
   });
 
   it("maps every theme key to its CSS variable", () => {
-    applyTheme(el, def({
-      theme: {
-        background: "#111",
-        surface: "#222",
-        text: "#fff",
-        textMuted: "#aaa",
-        border: "#444",
-        radius: "8px",
-      },
-    }));
+    applyTheme(
+      el,
+      def({
+        theme: {
+          background: "#111",
+          surface: "#222",
+          text: "#fff",
+          textMuted: "#aaa",
+          border: "#444",
+          radius: "8px",
+        },
+      }),
+    );
     expect(el.style.getPropertyValue("--iq-bg")).toBe("#111");
     expect(el.style.getPropertyValue("--iq-surface")).toBe("#222");
     expect(el.style.getPropertyValue("--iq-text")).toBe("#fff");

@@ -2,16 +2,16 @@ import type { FlowDefinition, ThemeOverrides } from "./types.js";
 
 /** Map theme keys to their CSS custom properties. */
 const THEME_VAR_MAP: Record<keyof ThemeOverrides, string> = {
-  brand:       "--iq-brand",
-  onBrand:     "--iq-on-brand",
-  background:  "--iq-bg",
-  surface:     "--iq-surface",
-  text:        "--iq-text",
-  textMuted:   "--iq-text-muted",
-  border:      "--iq-border",
-  radius:      "--iq-radius",
-  font:        "--iq-font",
-  headerFont:  "--iq-header-font",
+  brand: "--iq-brand",
+  onBrand: "--iq-on-brand",
+  background: "--iq-bg",
+  surface: "--iq-surface",
+  text: "--iq-text",
+  textMuted: "--iq-text-muted",
+  border: "--iq-border",
+  radius: "--iq-radius",
+  font: "--iq-font",
+  headerFont: "--iq-header-font",
 };
 
 /** Default font stack we append to user-provided font values, so that
@@ -44,7 +44,11 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = /^#?([a-f0-9]{3}|[a-f0-9]{6})$/i.exec(hex.trim());
   if (!m) return null;
   let h = m[1];
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length === 3)
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
   const n = parseInt(h, 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
@@ -87,4 +91,3 @@ function sanitize(v: unknown): string {
   if (typeof v !== "string") return "";
   return v.replace(/[\s;]+$/, "").trim();
 }
-

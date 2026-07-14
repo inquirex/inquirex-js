@@ -73,7 +73,9 @@ export class IqNumberInput extends LitElement {
     if (this.type === "currency") this.setAttribute("currency", "");
   }
 
-  focus() { this.updateComplete.then(() => this.inputEl?.focus()); }
+  focus() {
+    this.updateComplete.then(() => this.inputEl?.focus());
+  }
 
   getValue(): number | null {
     const raw = this.inputEl?.value;
@@ -82,7 +84,9 @@ export class IqNumberInput extends LitElement {
   }
 
   private handleInput() {
-    this.dispatchEvent(new CustomEvent("iq-input", { detail: this.getValue() }));
+    this.dispatchEvent(
+      new CustomEvent("iq-input", { detail: this.getValue() }),
+    );
   }
 
   private handleKeydown(e: KeyboardEvent) {
@@ -94,5 +98,7 @@ export class IqNumberInput extends LitElement {
 }
 
 declare global {
-  interface HTMLElementTagNameMap { "iq-number-input": IqNumberInput; }
+  interface HTMLElementTagNameMap {
+    "iq-number-input": IqNumberInput;
+  }
 }

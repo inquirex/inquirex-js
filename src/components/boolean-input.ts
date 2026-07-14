@@ -49,7 +49,9 @@ export class IqBooleanInput extends LitElement {
     `;
   }
 
-  getValue(): boolean | null { return this.selected; }
+  getValue(): boolean | null {
+    return this.selected;
+  }
 
   private select(value: boolean) {
     this.selected = value;
@@ -59,5 +61,7 @@ export class IqBooleanInput extends LitElement {
 }
 
 declare global {
-  interface HTMLElementTagNameMap { "iq-boolean-input": IqBooleanInput; }
+  interface HTMLElementTagNameMap {
+    "iq-boolean-input": IqBooleanInput;
+  }
 }
