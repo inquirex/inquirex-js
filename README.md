@@ -206,7 +206,7 @@ Priority for the definition itself: `json` > `url` > `site-id`.
 ### 2. npm / ESM
 
 ```ts
-import { mount } from 'inquirex-js';
+import { mount } from '@kigster/inquirex-js';
 
 mount({
   url: '/api/flows/my-flow',
@@ -662,7 +662,7 @@ A single step may contribute to any number of accumulators.
 `FlowEngine` exposes totals alongside answers and history:
 
 ```ts
-import { FlowEngine } from "inquirex-js";
+import { FlowEngine } from "@kigster/inquirex-js";
 
 const engine = new FlowEngine(flow);
 engine.answer("mfj");     // filing_status → +$400, +1 complexity
@@ -683,7 +683,7 @@ Totals are initialised from each accumulator's `default` and updated synchronous
 If you need to run the same math outside the engine (e.g. previewing a price inside a summary screen or a custom adapter), the shape evaluator is exported:
 
 ```ts
-import { accumulationContribution } from "inquirex-js";
+import { accumulationContribution } from "@kigster/inquirex-js";
 
 accumulationContribution({ lookup: { single: 200, mfj: 400 } }, "mfj");  // 400
 accumulationContribution({ per_unit: 25 }, 3);                            // 75

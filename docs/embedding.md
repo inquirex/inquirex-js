@@ -4,7 +4,7 @@ The widget ships as one package with two familiar browser surfaces:
 
 1. A **`<script src>` drop-in** (IIFE bundle) that self-initializes from
    `data-inquirex-*` attributes — the Intercom / Plausible / Cal.com model.
-1. An **ESM package** (`import { mount } from "inquirex-js"`) for apps that
+1. An **ESM package** (`import { mount } from "@kigster/inquirex-js"`) for apps that
    bundle, with full TypeScript types.
 
 Both funnel through the same configuration resolver, so every option below works
@@ -55,7 +55,7 @@ The nested `theme` object merges key-by-key under the same rule.
 ## 2. NPM / ESM
 
 ```ts
-import { mount } from "inquirex-js";
+import { mount } from "@kigster/inquirex-js";
 
 mount({
   url: "https://example.com/intake",
