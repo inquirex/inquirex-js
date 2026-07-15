@@ -164,30 +164,46 @@ If the flow declares [accumulators](#accumulators) (e.g. a `:price` running tota
 }
 ```
 
-## Attributes
+## Configuration
 
-| Attribute | Description |
-|-----------|-------------|
-| `data-inquirex-url` | GET the flow DSL JSON. Also the POST target for answers unless `submit-to` is set. Forwarded to LLM verbs as `?dsl=` |
-| `data-inquirex-site-id` | Shorthand — expands to `https://qualified.at/api/flows/{site-id}` |
-| `data-inquirex-json` | Inline JSON string (no GET request) |
-| `data-inquirex-submit-to` | POST completed answers here. Defaults to `data-inquirex-url` |
-| `data-inquirex-llm-url` | POST endpoint for LLM verbs (`{llm-url}?verb=extract&dsl=…`). Omit to disable LLM steps |
-| `data-inquirex-llm-timeout` | Client timeout in ms for one LLM call before falling back (default `20000`) |
-| `data-inquirex-auth` | Server-signed bearer token forwarded on every request |
-| `data-inquirex-origins` | Comma-separated origin allowlist; the widget won't run elsewhere ([Security](#security)) |
-| `data-inquirex-trigger` | `click` \| `auto` \| `delay` (default `click`) |
-| `data-inquirex-trigger-delay` | ms before auto-open when `trigger="delay"` (default `1000`) |
-| `data-inquirex-position` | `bottom-right` \| `bottom-left` (default `bottom-right`) |
-| `data-inquirex-theme` | JSON object of [theme overrides](docs/embedding.md#theming) |
+Everything below is one `InquirexConfig`, settable four ways. **Every option
+works identically** whether you use a script tag, npm, or the hosted bundle.
 
-Priority for the definition: `json` > `url` > `site-id`. Full configuration
-surface, precedence rules, the `mount()` API, the baked per-form bundle, theming,
-and auth are documented in **[docs/embedding.md](docs/embedding.md)**.
+### The full set
 
-### Programmatic Usage
+| Script attribute | Config key | Default | Purpose |
+|---|---|---|---|
+| `data-inquirex-url` | `url` | — | GET the flow DSL JSON. Also the POST target for answers unless `submit-to` is set. Forwarded to LLM verbs as `?dsl=` |
+| `data-inquirex-json` | `json` | — | Inline flow JSON string (skips the GET) |
+| `data-inquirex-site-id` | `siteId` | — | Shorthand — expands to `https://qualified.at/api/flows/{site-id}` |
+| `data-inquirex-submit-to` | `submitUrl` | _inherits `url`_ | POST completed answers here |
+| `data-inquirex-llm-url` | `llmUrl` | — | POST endpoint for LLM verbs (`{llm-url}?verb=extract&dsl=…`). Omit to disable LLM steps |
+| `data-inquirex-llm-timeout` | `llmTimeout` | `20000` | Client timeout (ms) for one LLM call before falling back |
+| `data-inquirex-auth` | `auth` | _flow `session.token`_ | Server-signed bearer token forwarded on every request ([Security](#security)) |
+| `data-inquirex-origins` | `origins` | _any_ | Origin allowlist (comma-separated in the attribute; array in config). The widget won't run elsewhere ([Security](#security)) |
+| `data-inquirex-trigger` | `trigger` | `click` | How it first opens: `click` \| `auto` \| `delay` |
+| `data-inquirex-trigger-delay` | `triggerDelay` | `1000` | ms before auto-open when `trigger="delay"` |
+| `data-inquirex-position` | `position` | `bottom-right` | Corner to anchor to: `bottom-right` \| `bottom-left` |
+| `data-inquirex-theme` | `theme` | — | [Theme overrides](#theme-keys) (JSON object in the attribute) |
 
-Install from npm and `mount()` the widget:
+Priority for the definition itself: `json` > `url` > `site-id`.
+
+### 1. Script tag
+
+```html
+<script src="https://example.com/assets/inquirex.js"
+        data-inquirex-url="https://example.com/intake"
+        data-inquirex-submit-to="https://example.com/intake/answers"
+        data-inquirex-llm-url="https://example.com/intake/llm"
+        data-inquirex-auth="<server-signed token>"
+        data-inquirex-origins="https://example.com"
+        data-inquirex-trigger="delay"
+        data-inquirex-trigger-delay="1000"
+        data-inquirex-position="bottom-left"
+        data-inquirex-theme='{"headerBg":"#111827","launcherRadius":"12px"}'></script>
+```
+
+### 2. npm / ESM
 
 ```ts
 import { mount } from 'inquirex-js';
@@ -195,18 +211,45 @@ import { mount } from 'inquirex-js';
 mount({
   url: '/api/flows/my-flow',
   llmUrl: '/api/flows/my-flow/llm',
+  trigger: 'delay',
+  triggerDelay: 1000,
   position: 'bottom-left',
-  theme: { headerBg: '#111827', highlight: '#f59e0b', radius: '0' },
+  origins: ['https://example.com'],
+  theme: { headerBg: '#111827', highlight: '#f59e0b', launcherRadius: '12px' },
 });
 ```
 
-Or write the custom element by hand (attribute names drop the `data-inquirex-`
-prefix):
+`mount(config?, target?)` returns the element; `createWidget(config)` builds it
+without attaching.
+
+### 3. The custom element directly
+
+Attribute names drop the `data-inquirex-` prefix:
 
 ```html
-<inquirex-widget url="/api/flows/my-flow" llm-url="/api/flows/my-flow/llm">
-</inquirex-widget>
+<inquirex-widget url="/api/flows/my-flow" llm-url="/api/flows/my-flow/llm"
+                 position="bottom-left" trigger="delay"></inquirex-widget>
 ```
+
+### 4. Global / baked bundle
+
+Set `window.InquirexConfig = {...}` before the script, or compile the config
+into a per-form bundle (what qualified.at does).
+
+### Precedence
+
+Each option resolves from the first source that provides it:
+
+1. an explicit `mount(config)` argument,
+1. `data-inquirex-*` attributes on the loading `<script>`,
+1. `window.InquirexConfig`,
+1. the build-time baked config,
+1. built-in defaults.
+
+The `theme` object merges key-by-key under the same rule. Full details — the
+baked bundle, the `mount()` API, launch/position — are in
+**[docs/embedding.md](docs/embedding.md)**. Visual knobs are under
+[Theming](#theming).
 
 ## Security
 
@@ -688,20 +731,97 @@ For more control, add a `theme` object alongside `brand`:
 
 ### Theme keys
 
-Every key is optional — omit any and the widget default is used.
+Every key is optional — omit any and the widget default is used. Each maps 1:1
+to a CSS custom property, so the same knob is reachable from the flow JSON, the
+embedder config, **or** your host page's CSS.
+
+**Brand & surfaces**
 
 | Key | CSS variable | Default | Controls |
 |-----|--------------|---------|----------|
-| `brand` | `--iq-brand` | `#2563eb` | Bubble, header gradient, answer bubbles, buttons, progress bar |
-| `onBrand` | `--iq-on-brand` | _auto-computed_ | Text/icon color on top of the brand color (override the auto-contrast) |
+| `brand` | `--iq-brand` | `#2563eb` | Primary accent: header gradient, answer bubbles, buttons, progress bar |
+| `onBrand` | `--iq-on-brand` | _auto-computed_ | Text/icon color on top of the brand color (overrides the auto-contrast) |
+| `highlight` | `--iq-highlight` | _inherits `brand`_ | Selection/focus accent on the form widgets (radios, checkboxes, inputs) |
 | `background` | `--iq-bg` | `#f8f7f4` | Panel body background |
 | `surface` | `--iq-surface` | `#ffffff` | Message bubble & input backgrounds |
 | `text` | `--iq-text` | `#1c1917` | Primary text |
 | `textMuted` | `--iq-text-muted` | `#78716c` | Secondary / placeholder text |
 | `border` | `--iq-border` | `#e7e5e4` | Input borders, dividers |
-| `radius` | `--iq-radius` | `18px` | Panel corner radius |
+
+**Header**
+
+| Key | CSS variable | Default | Controls |
+|-----|--------------|---------|----------|
+| `headerBg` | `--iq-header-bg` | _brand gradient_ | Header background — a solid color or any CSS `background` value |
+| `headerText` | `--iq-header-text` | _inherits `onBrand`_ | Header title, subtitle, and button colors |
+| `headerFont` | `--iq-header-font` | _inherits `font`_ | Header title font stack |
+| `headerFontSize` | `--iq-header-font-size` | `18px` | Header title size |
+
+**Chat bubbles**
+
+| Key | CSS variable | Default | Controls |
+|-----|--------------|---------|----------|
+| `bubbleQuestionBg` | `--iq-bubble-q-bg` | _inherits `surface`_ | Question bubble background |
+| `bubbleQuestionText` | `--iq-bubble-q-text` | _inherits `text`_ | Question bubble text |
+| `bubbleAnswerBg` | `--iq-bubble-a-bg` | _inherits `brand`_ | Answer bubble background |
+| `bubbleAnswerText` | `--iq-bubble-a-text` | _inherits `onBrand`_ | Answer bubble text |
+
+**Launcher** (the floating button the visitor clicks)
+
+| Key | CSS variable | Default | Controls |
+|-----|--------------|---------|----------|
+| `launcherBg` | `--iq-launcher-bg` | _inherits `brand`_ | Launcher background |
+| `launcherIcon` | `--iq-launcher-icon` | _inherits `onBrand`_ | Launcher icon color |
+| `launcherSize` | `--iq-launcher-size` | `60px` | Launcher diameter (the panel repositions to match) |
+| `launcherRadius` | `--iq-launcher-radius` | `50%` | Launcher shape — `50%` circle, `12px` squircle, `0` square |
+
+**Geometry & type**
+
+| Key | CSS variable | Default | Controls |
+|-----|--------------|---------|----------|
+| `panelWidth` | `--iq-panel-width` | `400px` | Panel width |
+| `panelMaxHeight` | `--iq-panel-max-height` | `620px` | Panel maximum height |
+| `offsetBlock` | `--iq-offset-block` | `24px` | Distance from the bottom edge of the viewport |
+| `offsetInline` | `--iq-offset-inline` | `24px` | Distance from the left/right edge (whichever `position` anchors to) |
+| `radius` | `--iq-radius` | `18px` | Panel corner radius (`0` for square) |
+| `padding` | `--iq-pad` | `16px` | Conversation inner padding |
 | `font` | `--iq-font` | `'Outfit', system-ui` | Body font stack |
-| `headerFont` | `--iq-header-font` | _inherits from `font`_ | Header title font stack |
+| `fontSize` | `--iq-font-size` | `15px` | Base font size |
+
+### Escape hatch — raw `--iq-*` properties
+
+Any key starting with `--iq-` is set verbatim, so you can reach a variable that
+has no named key yet (e.g. the derived `--iq-brand-dark`) without waiting for a
+release:
+
+```json
+"theme": {
+  "brand": "#7c3aed",
+  "--iq-brand-dark": "#4c1d95"
+}
+```
+
+The same works from the config `theme` object and the `data-inquirex-theme`
+attribute. Keys outside the `--iq-` namespace are ignored.
+
+### Setting the theme from your own CSS
+
+Because custom properties inherit through the shadow boundary, you can skip the
+theme object entirely and style the widget from the host page:
+
+```css
+inquirex-widget {
+  --iq-header-bg: #111827;
+  --iq-highlight: #f59e0b;
+  --iq-launcher-radius: 12px;
+  --iq-panel-width: 460px;
+  --iq-radius: 0;
+}
+```
+
+Precedence, lowest to highest: **built-in defaults < your host CSS < config
+`theme` / flow `meta.theme`** (the latter land as inline style). Mobile defaults
+(below 480px) are applied as *variables*, so an explicit theme still wins there.
 
 ### About fonts
 

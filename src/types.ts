@@ -145,16 +145,39 @@ export interface ThemeOverrides {
   launcherBg?: string;
   /** Floating launcher icon color (defaults to `onBrand`). */
   launcherIcon?: string;
+  /** Launcher diameter, e.g. "60px". */
+  launcherSize?: string;
+  /** Launcher corner radius. "50%" (default) is circular; "12px" is a squircle;
+   *  "0" is square. */
+  launcherRadius?: string;
+
+  // ── Panel geometry ──
+  /** Panel width, e.g. "400px". */
+  panelWidth?: string;
+  /** Panel maximum height, e.g. "620px". */
+  panelMaxHeight?: string;
+  /** Distance from the bottom edge of the viewport, e.g. "24px". */
+  offsetBlock?: string;
+  /** Distance from the left/right edge (whichever `position` anchors to),
+   *  e.g. "24px". */
+  offsetInline?: string;
 
   // ── Geometry & type ──
-  /** Corner radius for the panel & launcher, e.g. "18px" (use "0" for square). */
+  /** Corner radius for the panel, e.g. "18px" (use "0" for square). */
   radius?: string;
   /** Inner padding of the conversation area, e.g. "16px". */
   padding?: string;
   /** Body font family. */
   font?: string;
+  /** Base font size for the widget, e.g. "15px". */
+  fontSize?: string;
   /** Header font family (defaults to body font). */
   headerFont?: string;
+
+  /** Escape hatch: any raw `--iq-*` custom property, set verbatim. Lets you
+   *  reach a variable that has no named key yet — e.g.
+   *  `{ "--iq-brand-dark": "#123456" }`. */
+  [rawVar: `--iq-${string}`]: string | undefined;
 }
 
 /** How the copilot first opens. */

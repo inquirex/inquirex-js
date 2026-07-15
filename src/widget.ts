@@ -68,31 +68,43 @@ export class InquirexWidget extends LitElement {
       /* ── Launcher ── */
       --iq-launcher-bg: var(--iq-brand);
       --iq-launcher-icon: var(--iq-on-brand);
+      --iq-launcher-size: 60px;
+      --iq-launcher-radius: 50%;
+
+      /* ── Panel geometry ── */
+      --iq-panel-width: 400px;
+      --iq-panel-max-height: 620px;
+      --iq-offset-block: 24px;
+      --iq-offset-inline: 24px;
 
       /* ── Geometry & type ── */
       --iq-radius: 18px;
       --iq-pad: 16px;
       --iq-font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --iq-font-size: 15px;
       --iq-header-font: var(--iq-font);
 
       font-family: var(--iq-font);
-      font-size: 15px;
+      font-size: var(--iq-font-size);
       line-height: 1.5;
       color: var(--iq-text);
       position: fixed;
-      bottom: 24px;
-      right: 24px;
+      bottom: var(--iq-offset-block);
+      right: var(--iq-offset-inline);
       left: auto;
       z-index: 99999;
     }
 
     /* Anchor to the opposite corner. */
-    :host([position="bottom-left"]) { right: auto; left: 24px; }
+    :host([position="bottom-left"]) {
+      right: auto;
+      left: var(--iq-offset-inline);
+    }
 
     /* ── Floating trigger bubble ── */
     .bubble {
-      width: 60px; height: 60px;
-      border-radius: 50%;
+      width: var(--iq-launcher-size); height: var(--iq-launcher-size);
+      border-radius: var(--iq-launcher-radius);
       background: var(--iq-launcher-bg);
       color: var(--iq-launcher-icon);
       border: none;
@@ -114,7 +126,7 @@ export class InquirexWidget extends LitElement {
     .bubble.has-pulse::after {
       content: '';
       position: absolute; inset: -4px;
-      border-radius: 50%;
+      border-radius: var(--iq-launcher-radius);
       border: 2px solid var(--iq-launcher-bg);
       animation: pulse 2s ease-out infinite;
     }
@@ -126,9 +138,9 @@ export class InquirexWidget extends LitElement {
     /* ── Panel container ── */
     .panel {
       position: absolute;
-      bottom: 72px; right: 0; left: auto;
-      width: 400px;
-      max-height: 620px;
+      bottom: calc(var(--iq-launcher-size) + 12px); right: 0; left: auto;
+      width: var(--iq-panel-width);
+      max-height: var(--iq-panel-max-height);
       background: var(--iq-bg);
       border-radius: var(--iq-radius);
       box-shadow:
@@ -158,7 +170,7 @@ export class InquirexWidget extends LitElement {
       transform-origin: bottom left;
     }
     :host([position="bottom-left"]) .debug-panel {
-      right: auto; left: calc(400px + 12px);
+      right: auto; left: calc(var(--iq-panel-width) + 12px);
       transform-origin: bottom left;
     }
 
@@ -226,8 +238,8 @@ export class InquirexWidget extends LitElement {
     /* ── Debug panel (dev only — Ayu Dark inspired JSON inspector) ── */
     .debug-panel {
       position: absolute;
-      bottom: 72px;
-      right: calc(400px + 12px);
+      bottom: calc(var(--iq-launcher-size) + 12px);
+      right: calc(var(--iq-panel-width) + 12px);
       width: min(60vw, 720px);
       height: min(85dvh, 820px);
       background: #0b0e14;
@@ -461,11 +473,17 @@ export class InquirexWidget extends LitElement {
       40% { opacity: 1; transform: scale(1); }
     }
 
-    /* ── Responsive ── */
+    /* ── Responsive ──
+       Redefine the *variables*, not the rules: an explicit theme lands as inline
+       style on the host and therefore still wins over these mobile defaults. */
     @media (max-width: 480px) {
-      :host { bottom: 12px; right: 12px; left: 12px; }
-      .panel { width: auto; left: 0; right: 0; bottom: 68px; max-height: 75dvh; }
-      .bubble { width: 52px; height: 52px; }
+      :host {
+        --iq-launcher-size: 52px;
+        --iq-offset-block: 12px;
+        --iq-offset-inline: 12px;
+        left: 12px;
+      }
+      .panel { width: auto; left: 0; right: 0; max-height: 75dvh; }
     }
   `;
 
