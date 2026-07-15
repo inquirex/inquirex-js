@@ -7,6 +7,7 @@
 
 import type {
   InquirexConfig,
+  ThemeOverrides,
   TriggerMode,
   WidgetPosition,
 } from "./types.js";
@@ -73,16 +74,17 @@ export function mergeConfigs(
     }
   }
 
-  // Merge themes with the same earliest-wins rule.
+  // Merge themes with the same earliest-wins rule. Values are CSS strings; the
+  // cast is needed because ThemeOverrides carries a `--iq-*` index signature.
   if (themes.length) {
-    const theme: Record<string, unknown> = {};
+    const theme: Record<string, string> = {};
     for (const t of themes) {
       for (const [k, v] of Object.entries(t)) {
-        if (v === undefined || v === "") continue;
+        if (typeof v !== "string" || v === "") continue;
         if (theme[k] === undefined) theme[k] = v;
       }
     }
-    out.theme = theme;
+    out.theme = theme as unknown as ThemeOverrides;
   }
 
   return out;

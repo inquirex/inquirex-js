@@ -1,7 +1,8 @@
 import type { FlowDefinition, ThemeOverrides } from "./types.js";
 
-/** Map theme keys to their CSS custom properties. */
-const THEME_VAR_MAP: Record<keyof ThemeOverrides, string> = {
+/** Map named theme keys to their CSS custom properties. Exported so hosts (and
+ *  the docs) can introspect the full set of knobs. */
+export const THEME_VAR_MAP: Record<string, string> = {
   brand: "--iq-brand",
   onBrand: "--iq-on-brand",
   background: "--iq-bg",
@@ -19,11 +20,22 @@ const THEME_VAR_MAP: Record<keyof ThemeOverrides, string> = {
   bubbleAnswerText: "--iq-bubble-a-text",
   launcherBg: "--iq-launcher-bg",
   launcherIcon: "--iq-launcher-icon",
+  launcherSize: "--iq-launcher-size",
+  launcherRadius: "--iq-launcher-radius",
+  panelWidth: "--iq-panel-width",
+  panelMaxHeight: "--iq-panel-max-height",
+  offsetBlock: "--iq-offset-block",
+  offsetInline: "--iq-offset-inline",
   radius: "--iq-radius",
   padding: "--iq-pad",
   font: "--iq-font",
+  fontSize: "--iq-font-size",
   headerFont: "--iq-header-font",
 };
+
+/** A raw escape-hatch key: any `--iq-`-prefixed custom property. Restricted to
+ *  a conservative character set so a stray key can't smuggle odd syntax. */
+const RAW_VAR = /^--iq-[a-z0-9-]+$/i;
 
 /** Default font stack we append to user-provided font values, so that
  *  unavailable user fonts gracefully fall back to our Outfit + system stack
@@ -73,6 +85,12 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
  * here. Because these land as *inline* styles, they win over any host-page
  * stylesheet rule targeting the element — which is the documented precedence:
  * built-in defaults < host CSS < explicit theme.
+ *
+ * Two kinds of key are accepted:
+ *   - a named key from {@link THEME_VAR_MAP} (`headerBg`, `launcherRadius`, …);
+ *   - a raw `--iq-*` custom property, set verbatim — the escape hatch for any
+ *     variable that has no named key yet.
+ * Unknown keys are ignored rather than throwing.
  */
 export function applyThemeOverrides(
   el: HTMLElement,
@@ -92,7 +110,12 @@ export function applyThemeOverrides(
   for (const [key, raw] of Object.entries(theme)) {
     const value = sanitize(raw);
     if (!value) continue;
-    const cssVar = THEME_VAR_MAP[key as keyof ThemeOverrides];
+    // A raw `--iq-*` key passes straight through; otherwise map the named key.
+    const cssVar = key.startsWith("--iq-")
+      ? RAW_VAR.test(key)
+        ? key
+        : ""
+      : THEME_VAR_MAP[key];
     if (!cssVar) continue;
     // For font stacks, append the widget's fallback so unavailable user
     // fonts degrade to Outfit / system fonts rather than generic sans-serif.

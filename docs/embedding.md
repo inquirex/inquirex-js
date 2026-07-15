@@ -132,24 +132,41 @@ variables below and are applied as inline style (so they win over host CSS).
 
 **c. Flow `meta.theme`** — the same keys, authored in Ruby and shipped in the DSL.
 
-| Theme key | CSS variable | Controls |
-| --- | --- | --- |
-| `brand` | `--iq-brand` | Primary accent (buttons, answer bubble, launcher) |
-| `onBrand` | `--iq-on-brand` | Text on brand (auto-contrasted if omitted) |
-| `background` | `--iq-bg` | Chat-window background |
-| `surface` | `--iq-surface` | Input & bubble surface |
-| `text` / `textMuted` | `--iq-text` / `--iq-text-muted` | Text colors |
-| `border` | `--iq-border` | Input / divider borders |
-| `headerBg` | `--iq-header-bg` | Header background (solid or gradient) |
-| `headerText` | `--iq-header-text` | Header text/icon color |
-| `headerFontSize` | `--iq-header-font-size` | Header title size |
-| `highlight` | `--iq-highlight` | Form-widget selection / focus accent |
-| `bubbleQuestionBg` / `bubbleQuestionText` | `--iq-bubble-q-bg` / `--iq-bubble-q-text` | Question bubble |
-| `bubbleAnswerBg` / `bubbleAnswerText` | `--iq-bubble-a-bg` / `--iq-bubble-a-text` | Answer bubble |
-| `launcherBg` / `launcherIcon` | `--iq-launcher-bg` / `--iq-launcher-icon` | Floating launcher |
-| `radius` | `--iq-radius` | Panel & launcher corner radius (`0` = square) |
-| `padding` | `--iq-pad` | Conversation inner padding |
-| `font` / `headerFont` | `--iq-font` / `--iq-header-font` | Font families |
+**d. Raw `--iq-*` escape hatch** — any key starting with `--iq-` is set verbatim,
+so you can reach a variable with no named key yet (e.g. the derived
+`--iq-brand-dark`). Keys outside the `--iq-` namespace are ignored.
+
+```json
+"theme": { "brand": "#7c3aed", "--iq-brand-dark": "#4c1d95" }
+```
+
+| Theme key | CSS variable | Default | Controls |
+| --- | --- | --- | --- |
+| `brand` | `--iq-brand` | `#2563eb` | Primary accent (buttons, answer bubble, launcher) |
+| `onBrand` | `--iq-on-brand` | auto | Text on brand (auto-contrasted if omitted) |
+| `highlight` | `--iq-highlight` | `brand` | Form-widget selection / focus accent |
+| `background` | `--iq-bg` | `#f8f7f4` | Chat-window background |
+| `surface` | `--iq-surface` | `#ffffff` | Input & bubble surface |
+| `text` / `textMuted` | `--iq-text` / `--iq-text-muted` | `#1c1917` / `#78716c` | Text colors |
+| `border` | `--iq-border` | `#e7e5e4` | Input / divider borders |
+| `headerBg` | `--iq-header-bg` | brand gradient | Header background (solid or gradient) |
+| `headerText` | `--iq-header-text` | `onBrand` | Header text/icon color |
+| `headerFontSize` | `--iq-header-font-size` | `18px` | Header title size |
+| `bubbleQuestionBg` / `bubbleQuestionText` | `--iq-bubble-q-bg` / `--iq-bubble-q-text` | `surface` / `text` | Question bubble |
+| `bubbleAnswerBg` / `bubbleAnswerText` | `--iq-bubble-a-bg` / `--iq-bubble-a-text` | `brand` / `onBrand` | Answer bubble |
+| `launcherBg` / `launcherIcon` | `--iq-launcher-bg` / `--iq-launcher-icon` | `brand` / `onBrand` | Launcher colors |
+| `launcherSize` | `--iq-launcher-size` | `60px` | Launcher diameter (panel repositions to match) |
+| `launcherRadius` | `--iq-launcher-radius` | `50%` | Launcher shape (`50%` circle, `12px` squircle, `0` square) |
+| `panelWidth` | `--iq-panel-width` | `400px` | Panel width |
+| `panelMaxHeight` | `--iq-panel-max-height` | `620px` | Panel max height |
+| `offsetBlock` / `offsetInline` | `--iq-offset-block` / `--iq-offset-inline` | `24px` / `24px` | Distance from the viewport edges |
+| `radius` | `--iq-radius` | `18px` | Panel corner radius (`0` = square) |
+| `padding` | `--iq-pad` | `16px` | Conversation inner padding |
+| `font` / `headerFont` | `--iq-font` / `--iq-header-font` | Outfit stack | Font families |
+| `fontSize` | `--iq-font-size` | `15px` | Base font size |
+
+Mobile defaults (below 480px) are applied as *variables*, not rules, so an
+explicit theme still wins on small screens.
 
 ## Authenticating requests
 

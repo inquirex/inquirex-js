@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { contrastColor, darken, applyTheme } from "../src/theme.js";
+import {
+  contrastColor,
+  darken,
+  applyTheme,
+  applyThemeOverrides,
+} from "../src/theme.js";
 import type { FlowDefinition } from "../src/types.js";
 
 describe("contrastColor", () => {
@@ -168,5 +173,81 @@ describe("applyTheme", () => {
   it("strips multiple trailing semicolons and whitespace", () => {
     applyTheme(el, def({ theme: { radius: "  12px  ;;  " } }));
     expect(el.style.getPropertyValue("--iq-radius")).toBe("12px");
+  });
+
+  it("maps the launcher, panel, offset, and font-size knobs", () => {
+    applyTheme(
+      el,
+      def({
+        theme: {
+          launcherSize: "72px",
+          launcherRadius: "12px",
+          panelWidth: "480px",
+          panelMaxHeight: "700px",
+          offsetBlock: "8px",
+          offsetInline: "40px",
+          fontSize: "16px",
+        },
+      }),
+    );
+    expect(el.style.getPropertyValue("--iq-launcher-size")).toBe("72px");
+    expect(el.style.getPropertyValue("--iq-launcher-radius")).toBe("12px");
+    expect(el.style.getPropertyValue("--iq-panel-width")).toBe("480px");
+    expect(el.style.getPropertyValue("--iq-panel-max-height")).toBe("700px");
+    expect(el.style.getPropertyValue("--iq-offset-block")).toBe("8px");
+    expect(el.style.getPropertyValue("--iq-offset-inline")).toBe("40px");
+    expect(el.style.getPropertyValue("--iq-font-size")).toBe("16px");
+  });
+});
+
+describe("applyThemeOverrides — raw --iq-* escape hatch", () => {
+  let el: HTMLElement;
+
+  beforeEach(() => {
+    el = {
+      style: {
+        _map: new Map<string, string>(),
+        setProperty(k: string, v: string) {
+          (this as any)._map.set(k, v);
+        },
+        getPropertyValue(k: string) {
+          return (this as any)._map.get(k) ?? "";
+        },
+      },
+    } as unknown as HTMLElement;
+  });
+
+  it("passes a raw --iq-* property straight through", () => {
+    applyThemeOverrides(el, { "--iq-brand-dark": "#123456" });
+    expect(el.style.getPropertyValue("--iq-brand-dark")).toBe("#123456");
+  });
+
+  it("reaches a variable that has no named key", () => {
+    applyThemeOverrides(el, { "--iq-panel-max-height": "90dvh" });
+    expect(el.style.getPropertyValue("--iq-panel-max-height")).toBe("90dvh");
+  });
+
+  it("mixes raw and named keys", () => {
+    applyThemeOverrides(el, {
+      headerBg: "#111",
+      "--iq-launcher-size": "80px",
+    });
+    expect(el.style.getPropertyValue("--iq-header-bg")).toBe("#111");
+    expect(el.style.getPropertyValue("--iq-launcher-size")).toBe("80px");
+  });
+
+  it("ignores custom properties outside the --iq- namespace", () => {
+    applyThemeOverrides(el, { "--evil-thing": "red" } as never);
+    expect(el.style.getPropertyValue("--evil-thing")).toBe("");
+  });
+
+  it("ignores a malformed --iq- key rather than setting it", () => {
+    applyThemeOverrides(el, { "--iq-bad key;x": "red" } as never);
+    expect(el.style.getPropertyValue("--iq-bad key;x")).toBe("");
+  });
+
+  it("ignores unknown named keys", () => {
+    applyThemeOverrides(el, { notAThing: "red" } as never);
+    expect(el.style.getPropertyValue("notAThing")).toBe("");
   });
 });
