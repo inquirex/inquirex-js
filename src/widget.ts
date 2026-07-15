@@ -2,8 +2,17 @@ import { LitElement, html, css, nothing, type PropertyValues } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { FlowEngine } from "./engine.js";
-import { applyTheme } from "./theme.js";
-import type { FlowDefinition, StepDefinition, HistoryEntry, Option } from "./types.js";
+import { runServerVerb } from "./server-verb.js";
+import { applyTheme, applyThemeOverrides } from "./theme.js";
+import type {
+  FlowDefinition,
+  StepDefinition,
+  HistoryEntry,
+  Option,
+  ThemeOverrides,
+  TriggerMode,
+  WidgetPosition,
+} from "./types.js";
 
 // Register sub-components (side-effect imports)
 import "./components/text-input.js";
@@ -24,22 +33,45 @@ const SEND_ICON = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="non
 const CHECK_ICON = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 const BUG_ICON = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><line x1="12" y1="6" x2="12" y2="4"/><line x1="9.5" y1="4" x2="14.5" y2="4"/><line x1="19" y1="8" x2="16" y2="10"/><line x1="5" y1="8" x2="8" y2="10"/><line x1="19" y1="18" x2="16" y2="16"/><line x1="5" y1="18" x2="8" y2="16"/><line x1="19" y1="13" x2="16" y2="13"/><line x1="5" y1="13" x2="8" y2="13"/></svg>`;
 
-
 @customElement("inquirex-widget")
 export class InquirexWidget extends LitElement {
   static styles = css`
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
 
     :host {
+      /* ── Brand ── */
       --iq-brand: #2563eb;
       --iq-brand-dark: color-mix(in srgb, var(--iq-brand) 85%, #000);
       --iq-on-brand: #ffffff;
+
+      /* ── Form-widget selection / focus accent ── */
+      --iq-highlight: var(--iq-brand);
+
+      /* ── Surfaces ── */
       --iq-bg: #f8f7f4;
       --iq-surface: #ffffff;
       --iq-text: #1c1917;
       --iq-text-muted: #78716c;
       --iq-border: #e7e5e4;
+
+      /* ── Header ── */
+      --iq-header-bg: linear-gradient(135deg, var(--iq-brand), var(--iq-brand-dark));
+      --iq-header-text: var(--iq-on-brand);
+      --iq-header-font-size: 18px;
+
+      /* ── Chat bubbles ── */
+      --iq-bubble-q-bg: var(--iq-surface);
+      --iq-bubble-q-text: var(--iq-text);
+      --iq-bubble-a-bg: var(--iq-brand);
+      --iq-bubble-a-text: var(--iq-on-brand);
+
+      /* ── Launcher ── */
+      --iq-launcher-bg: var(--iq-brand);
+      --iq-launcher-icon: var(--iq-on-brand);
+
+      /* ── Geometry & type ── */
       --iq-radius: 18px;
+      --iq-pad: 16px;
       --iq-font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
       --iq-header-font: var(--iq-font);
 
@@ -50,20 +82,24 @@ export class InquirexWidget extends LitElement {
       position: fixed;
       bottom: 24px;
       right: 24px;
+      left: auto;
       z-index: 99999;
     }
+
+    /* Anchor to the opposite corner. */
+    :host([position="bottom-left"]) { right: auto; left: 24px; }
 
     /* ── Floating trigger bubble ── */
     .bubble {
       width: 60px; height: 60px;
       border-radius: 50%;
-      background: var(--iq-brand);
-      color: var(--iq-on-brand);
+      background: var(--iq-launcher-bg);
+      color: var(--iq-launcher-icon);
       border: none;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       box-shadow:
-        0 4px 20px color-mix(in srgb, var(--iq-brand) 35%, transparent),
+        0 4px 20px color-mix(in srgb, var(--iq-launcher-bg) 35%, transparent),
         0 2px 8px rgba(0,0,0,0.08);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       position: relative;
@@ -71,7 +107,7 @@ export class InquirexWidget extends LitElement {
     .bubble:hover {
       transform: scale(1.08);
       box-shadow:
-        0 6px 28px color-mix(in srgb, var(--iq-brand) 45%, transparent),
+        0 6px 28px color-mix(in srgb, var(--iq-launcher-bg) 45%, transparent),
         0 2px 8px rgba(0,0,0,0.1);
     }
     .bubble:active { transform: scale(0.95); }
@@ -79,7 +115,7 @@ export class InquirexWidget extends LitElement {
       content: '';
       position: absolute; inset: -4px;
       border-radius: 50%;
-      border: 2px solid var(--iq-brand);
+      border: 2px solid var(--iq-launcher-bg);
       animation: pulse 2s ease-out infinite;
     }
     @keyframes pulse {
@@ -90,7 +126,7 @@ export class InquirexWidget extends LitElement {
     /* ── Panel container ── */
     .panel {
       position: absolute;
-      bottom: 72px; right: 0;
+      bottom: 72px; right: 0; left: auto;
       width: 400px;
       max-height: 620px;
       background: var(--iq-bg);
@@ -116,10 +152,20 @@ export class InquirexWidget extends LitElement {
       to   { opacity: 0; transform: scale(0.92) translateY(12px); }
     }
 
+    /* Mirror the panel (and dev inspector) when anchored bottom-left. */
+    :host([position="bottom-left"]) .panel {
+      right: auto; left: 0;
+      transform-origin: bottom left;
+    }
+    :host([position="bottom-left"]) .debug-panel {
+      right: auto; left: calc(400px + 12px);
+      transform-origin: bottom left;
+    }
+
     /* ── Header ── */
     .header {
-      background: linear-gradient(135deg, var(--iq-brand), var(--iq-brand-dark));
-      color: var(--iq-on-brand);
+      background: var(--iq-header-bg);
+      color: var(--iq-header-text);
       padding: 20px 20px 18px;
       position: relative;
       display: flex;
@@ -131,7 +177,7 @@ export class InquirexWidget extends LitElement {
       width: 60px; height: 60px;
       border-radius: 10px;
       overflow: hidden;
-      background: color-mix(in srgb, var(--iq-on-brand) 12%, transparent);
+      background: color-mix(in srgb, var(--iq-header-text) 12%, transparent);
       display: flex; align-items: center; justify-content: center;
     }
     .header-logo img {
@@ -142,7 +188,7 @@ export class InquirexWidget extends LitElement {
     .header-text { flex: 1; min-width: 0; padding-right: 72px; }
     .header-title {
       font-family: var(--iq-header-font);
-      font-size: 18px; font-weight: 700;
+      font-size: var(--iq-header-font-size); font-weight: 700;
       margin: 0 0 2px;
       letter-spacing: -0.01em;
     }
@@ -153,28 +199,28 @@ export class InquirexWidget extends LitElement {
     }
     .close-btn {
       position: absolute; top: 14px; right: 14px;
-      background: color-mix(in srgb, var(--iq-on-brand) 18%, transparent);
-      border: none; color: var(--iq-on-brand);
+      background: color-mix(in srgb, var(--iq-header-text) 18%, transparent);
+      border: none; color: var(--iq-header-text);
       width: 32px; height: 32px;
       border-radius: 8px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s;
     }
-    .close-btn:hover { background: color-mix(in srgb, var(--iq-on-brand) 30%, transparent); }
+    .close-btn:hover { background: color-mix(in srgb, var(--iq-header-text) 30%, transparent); }
 
     /* ── Debug button (dev only, sits next to the X) ── */
     .debug-btn {
       position: absolute; top: 14px; right: 54px;
-      background: color-mix(in srgb, var(--iq-on-brand) 18%, transparent);
-      border: none; color: var(--iq-on-brand);
+      background: color-mix(in srgb, var(--iq-header-text) 18%, transparent);
+      border: none; color: var(--iq-header-text);
       width: 32px; height: 32px;
       border-radius: 8px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, transform 0.1s;
     }
-    .debug-btn:hover { background: color-mix(in srgb, var(--iq-on-brand) 30%, transparent); }
+    .debug-btn:hover { background: color-mix(in srgb, var(--iq-header-text) 30%, transparent); }
     .debug-btn:active { transform: scale(0.92); }
 
     /* ── Debug panel (dev only — Ayu Dark inspired JSON inspector) ── */
@@ -265,7 +311,7 @@ export class InquirexWidget extends LitElement {
     .conversation {
       flex: 1;
       overflow-y: auto;
-      padding: 16px 16px 8px;
+      padding: var(--iq-pad) var(--iq-pad) 8px;
       display: flex; flex-direction: column; gap: 12px;
       scroll-behavior: smooth;
     }
@@ -279,7 +325,8 @@ export class InquirexWidget extends LitElement {
       to   { opacity: 1; transform: translateY(0); }
     }
     .bubble-q {
-      background: var(--iq-surface);
+      background: var(--iq-bubble-q-bg);
+      color: var(--iq-bubble-q-text);
       padding: 12px 16px;
       border-radius: 14px 14px 14px 4px;
       font-size: 15px;
@@ -287,8 +334,8 @@ export class InquirexWidget extends LitElement {
       box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
     .bubble-a {
-      background: var(--iq-brand);
-      color: var(--iq-on-brand);
+      background: var(--iq-bubble-a-bg);
+      color: var(--iq-bubble-a-text);
       padding: 10px 16px;
       border-radius: 14px 14px 4px 14px;
       font-size: 14px;
@@ -318,7 +365,7 @@ export class InquirexWidget extends LitElement {
 
     /* ── Input area ── */
     .input-area {
-      padding: 12px 16px 16px;
+      padding: 12px var(--iq-pad) var(--iq-pad);
       border-top: 1px solid var(--iq-border);
       background: var(--iq-surface);
       animation: msgIn 0.3s ease forwards;
@@ -391,6 +438,29 @@ export class InquirexWidget extends LitElement {
     }
     .footer a:hover { text-decoration: underline; }
 
+    /* ── Extract "thinking" indicator ── */
+    .bubble-q.thinking {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--iq-text-muted);
+    }
+    .thinking-dots { display: inline-flex; gap: 4px; }
+    .thinking-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--iq-brand);
+      opacity: 0.4;
+      animation: iqThinking 1.2s infinite ease-in-out both;
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes iqThinking {
+      0%, 80%, 100% { opacity: 0.4; transform: scale(0.85); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+
     /* ── Responsive ── */
     @media (max-width: 480px) {
       :host { bottom: 12px; right: 12px; left: 12px; }
@@ -399,12 +469,44 @@ export class InquirexWidget extends LitElement {
     }
   `;
 
-  /** URL to fetch the flow definition JSON. */
-  @property({ attribute: "flow-url" }) flowUrl = "";
+  /** URL to GET the flow definition JSON; also the POST target for completed
+   *  answers unless {@link submitUrl} is set. Forwarded to LLM verbs as `?dsl=`. */
+  @property({ attribute: "url" }) url = "";
 
-  /** Inline JSON string (alternative to flow-url). */
-  @property({ attribute: "flow-json" }) flowJson = "";
+  /** Inline flow definition JSON string (skips the GET). */
+  @property({ attribute: "json" }) flowJson = "";
 
+  /** POST completed answers here. Empty → falls back to {@link url}. */
+  @property({ attribute: "submit-to" }) submitUrl = "";
+
+  /** Endpoint for LLM server verbs. Requests go to `{llmUrl}?verb=…&dsl=…`.
+   *  When empty, LLM steps degrade to the manual-form fallback. */
+  @property({ attribute: "llm-url" }) llmUrl = "";
+
+  /** Client timeout (ms) for one LLM round-trip before falling back. */
+  @property({ attribute: "llm-timeout", type: Number }) llmTimeout = 20000;
+
+  /** Server-signed bearer token forwarded on every request (GET flow, POST
+   *  answers, POST LLM). Falls back to the flow definition's `session.token`. */
+  @property({ attribute: "auth" }) auth = "";
+
+  /** Origins this embed may run on. Empty = any. When set and the current
+   *  `location.origin` is not listed, the widget renders nothing and makes no
+   *  requests. Client-side defense-in-depth, not a security boundary. */
+  @property({ type: Array, attribute: "origins" }) origins: string[] = [];
+
+  /** How the copilot first opens: "click" | "auto" | "delay". */
+  @property({ attribute: "trigger" }) trigger: TriggerMode = "click";
+
+  /** Delay (ms) before auto-opening when `trigger` is "delay". */
+  @property({ attribute: "trigger-delay", type: Number }) triggerDelay = 1000;
+
+  /** Screen corner to anchor to (reflected so `:host([position])` CSS applies). */
+  @property({ attribute: "position", reflect: true }) position: WidgetPosition =
+    "bottom-right";
+
+  /** Programmatic theme overrides, applied on top of the flow's `meta.theme`. */
+  @property({ attribute: false }) themeOverrides?: ThemeOverrides;
 
   @state() private open = false;
   @state() private engine: FlowEngine | null = null;
@@ -416,11 +518,48 @@ export class InquirexWidget extends LitElement {
   @state() private debugOpen = false;
   @state() private highlightedJson = "";
 
+  /** Bearer credential forwarded on every request. Resolves to the explicit
+   *  `auth` token, else the flow definition's server-issued `session.token`. */
+  private sessionToken = "";
+
+  /** True once the visitor has clicked the launcher, so a delayed auto-open
+   *  never fights a user who already opened or dismissed the panel. */
+  private userInteracted = false;
+
   @query(".conversation") private conversationEl!: HTMLElement;
 
   connectedCallback() {
     super.connectedCallback();
+    // Refuse to run on a non-allowlisted origin — no fetch, no render.
+    if (!this.originAllowed) {
+      console.warn(
+        `[inquirex] not authorized for origin ${globalThis.location?.origin}; ` +
+          `allowed: ${this.origins.join(", ")}`,
+      );
+      return;
+    }
     this.loadDefinition();
+  }
+
+  /** Whether the current page origin is permitted to run this embed. */
+  private get originAllowed(): boolean {
+    if (!this.origins.length) return true;
+    const here = globalThis.location?.origin;
+    return !!here && this.origins.includes(here);
+  }
+
+  firstUpdated() {
+    if (!this.originAllowed) return;
+    // Apply programmatic theme early so it survives a flow-load failure.
+    applyThemeOverrides(this, this.themeOverrides);
+    if (this.userInteracted) return;
+    if (this.trigger === "auto") {
+      this.openPanel();
+    } else if (this.trigger === "delay") {
+      window.setTimeout(() => {
+        if (!this.userInteracted) this.openPanel();
+      }, this.triggerDelay);
+    }
   }
 
   private async loadDefinition() {
@@ -428,23 +567,38 @@ export class InquirexWidget extends LitElement {
       let def: FlowDefinition;
       if (this.flowJson) {
         def = JSON.parse(this.flowJson);
-      } else if (this.flowUrl) {
-        const res = await fetch(this.flowUrl);
+      } else if (this.url) {
+        const res = await fetch(this.url, {
+          headers: this.authHeader(this.auth),
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         def = await res.json();
       } else {
-        throw new Error("Provide flow-url or flow-json attribute");
+        throw new Error("Provide a url or json config");
       }
       this.engine = new FlowEngine(def);
+      // Explicit auth token wins; otherwise use the server-issued session token.
+      this.sessionToken = this.auth || def.session?.token || "";
       applyTheme(this, def);
+      // Config theme overrides win over the flow's own theme.
+      applyThemeOverrides(this, this.themeOverrides);
     } catch (e) {
       this.error = e instanceof Error ? e.message : "Failed to load flow";
     } finally {
       this.loading = false;
     }
+    // The flow may open directly on a server step.
+    await this.maybeRunExtraction();
+  }
+
+  /** Bearer auth header for a token, or an empty object when there is none. */
+  private authHeader(token: string): Record<string, string> {
+    return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
   render() {
+    // Blocked origin → render nothing at all (no launcher, no panel).
+    if (!this.originAllowed) return nothing;
     return html`
       ${this.open ? this.renderPanel() : nothing}
       <button
@@ -467,21 +621,29 @@ export class InquirexWidget extends LitElement {
     const showDebug = import.meta.env.DEV && this.debugOpen && engine;
 
     return html`
-      ${showDebug ? this.renderDebugPanel(engine!) : nothing}
+      ${engine && showDebug ? this.renderDebugPanel(engine) : nothing}
       <div class="panel" @animationend=${this.onPanelAnimEnd}>
         <div class="header">
-          ${meta?.brand?.logo ? html`
+          ${
+            meta?.brand?.logo
+              ? html`
             <div class="header-logo"><img src=${meta.brand.logo} alt=${meta.brand.name ?? ""}/></div>
-          ` : nothing}
+          `
+              : nothing
+          }
           <div class="header-text">
             <p class="header-title">${meta?.title ?? "Questionnaire"}</p>
             ${meta?.subtitle ? html`<p class="header-subtitle">${meta.subtitle}</p>` : nothing}
           </div>
-          ${import.meta.env.DEV ? html`
+          ${
+            import.meta.env.DEV
+              ? html`
             <button class="debug-btn" @click=${this.toggleDebug}
               title=${this.debugOpen ? "Hide state inspector" : "Show state inspector"}
               aria-label="Toggle debug panel">${BUG_ICON}</button>
-          ` : nothing}
+          `
+              : nothing
+          }
           <button class="close-btn" @click=${this.togglePanel} aria-label="Close">${CLOSE_ICON}</button>
         </div>
         <div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div>
@@ -511,9 +673,7 @@ export class InquirexWidget extends LitElement {
           </span>
         </div>
         <pre class="debug-content"><code class="shj-lang-json">${
-          this.highlightedJson
-            ? unsafeHTML(this.highlightedJson)
-            : "loading..."
+          this.highlightedJson ? unsafeHTML(this.highlightedJson) : "loading..."
         }</code></pre>
       </div>
     `;
@@ -574,19 +734,32 @@ export class InquirexWidget extends LitElement {
 
   private renderCurrentQuestion(engine: FlowEngine) {
     const step = engine.currentStep;
+
+    // Server-processing step: no input control — show a thinking indicator
+    // while the widget round-trips (or advances past it on fallback).
+    if (engine.currentStepIsExtract) {
+      return this.renderThinking(step);
+    }
+
     const questionText = step.question ?? step.text ?? "";
     const verbClass = `msg-${step.verb}`;
 
-    const isDisplay = step.verb === "say" || step.verb === "header" || step.verb === "btw" || step.verb === "warning";
+    const isDisplay =
+      step.verb === "say" ||
+      step.verb === "header" ||
+      step.verb === "btw" ||
+      step.verb === "warning";
 
     return html`
       <div class="msg msg-q ${verbClass}">
         <div class="bubble-q">${questionText}</div>
       </div>
       <div class="input-area">
-        ${isDisplay
-          ? html`<button class="continue-btn" @click=${this.handleContinue}>Continue</button>`
-          : this.renderInputControl(step)}
+        ${
+          isDisplay
+            ? html`<button class="continue-btn" @click=${this.handleContinue}>Continue</button>`
+            : this.renderInputControl(step)
+        }
       </div>
     `;
   }
@@ -605,7 +778,9 @@ export class InquirexWidget extends LitElement {
         return html`
           <iq-multi-enum
             .options=${step.options ?? []}
-            @iq-input=${() => { this.inputValid = true; }}
+            @iq-input=${() => {
+              this.inputValid = true;
+            }}
           ></iq-multi-enum>
           <button
             class="continue-btn"
@@ -629,7 +804,9 @@ export class InquirexWidget extends LitElement {
               type=${type}
               .value=${step.default != null ? Number(step.default) : null}
               @iq-submit=${this.handleSubmitInput}
-              @iq-input=${() => { this.inputValid = true; }}
+              @iq-input=${() => {
+                this.inputValid = true;
+              }}
             ></iq-number-input>
             <button class="submit-btn" @click=${this.handleSubmitInput}>${SEND_ICON}</button>
           </div>
@@ -639,7 +816,9 @@ export class InquirexWidget extends LitElement {
         return html`
           <iq-text-input
             type="text"
-            @iq-input=${() => { this.inputValid = true; }}
+            @iq-input=${() => {
+              this.inputValid = true;
+            }}
           ></iq-text-input>
           <button
             class="continue-btn"
@@ -654,12 +833,26 @@ export class InquirexWidget extends LitElement {
             <iq-text-input
               type=${type ?? "string"}
               @iq-submit=${this.handleSubmitInput}
-              @iq-input=${() => { this.inputValid = true; }}
+              @iq-input=${() => {
+                this.inputValid = true;
+              }}
             ></iq-text-input>
             <button class="submit-btn" @click=${this.handleSubmitInput}>${SEND_ICON}</button>
           </div>
         `;
     }
+  }
+
+  private renderThinking(step: StepDefinition) {
+    const label = step.thinking_label ?? "Thinking…";
+    return html`
+      <div class="msg msg-q msg-extract">
+        <div class="bubble-q thinking">
+          <span class="thinking-dots"><span></span><span></span><span></span></span>
+          ${label}
+        </div>
+      </div>
+    `;
   }
 
   private renderComplete() {
@@ -691,31 +884,37 @@ export class InquirexWidget extends LitElement {
   /* ── Event handlers ── */
 
   private togglePanel() {
+    this.userInteracted = true;
     this.pulsed = false;
     if (this.open) {
       // Trigger close animation
       const panel = this.shadowRoot?.querySelector(".panel");
       panel?.classList.add("closing");
     } else {
-      this.open = true;
-      this.updateComplete.then(() => this.scrollToBottom());
+      this.openPanel();
     }
+  }
+
+  /** Open the panel (used by both the launcher click and auto/delay triggers). */
+  private openPanel() {
+    if (this.open) return;
+    this.pulsed = false;
+    this.open = true;
+    this.updateComplete.then(() => this.scrollToBottom());
   }
 
   private onPanelAnimEnd(e: AnimationEvent) {
     if (e.animationName === "panelOut") this.open = false;
   }
 
-  private handleContinue() {
+  private async handleContinue() {
     this.engine?.acknowledge();
-    this.inputValid = false;
-    this.requestUpdate();
-    this.updateComplete.then(() => this.scrollToBottom());
-    this.refreshHighlight();
+    this.afterAdvance();
+    await this.maybeRunExtraction();
     this.autoSubmitIfComplete();
   }
 
-  private handleSubmitInput() {
+  private async handleSubmitInput() {
     const engine = this.engine;
     if (!engine) return;
 
@@ -731,11 +930,39 @@ export class InquirexWidget extends LitElement {
     if (Array.isArray(value) && value.length === 0) return;
 
     engine.answer(value);
+    this.afterAdvance();
+    await this.maybeRunExtraction();
+    this.autoSubmitIfComplete();
+  }
+
+  /** Shared UI refresh after the engine advances a step. */
+  private afterAdvance() {
     this.inputValid = false;
     this.requestUpdate();
     this.updateComplete.then(() => this.scrollToBottom());
     this.refreshHighlight();
-    this.autoSubmitIfComplete();
+  }
+
+  /**
+   * Drive the LLM round-trip whenever the engine lands on a server step,
+   * chaining through consecutive server verbs. All fetch/fallback logic lives
+   * in {@link runServerVerb} (DOM-free, unit-tested); this method owns only the
+   * spinner refresh between hops. The widget never sees or sends a prompt.
+   */
+  private async maybeRunExtraction(): Promise<void> {
+    const engine = this.engine;
+    if (!engine) return;
+
+    while (!engine.finished && engine.currentStepIsExtract) {
+      this.afterAdvance(); // show the thinking spinner
+      await runServerVerb(engine, {
+        llmUrl: this.llmUrl,
+        dslUrl: this.url,
+        auth: this.sessionToken,
+        timeoutMs: this.llmTimeout,
+      });
+      this.afterAdvance(); // reflect the merged result / fallback
+    }
   }
 
   private extractValue(step: StepDefinition): unknown {
@@ -745,29 +972,47 @@ export class InquirexWidget extends LitElement {
 
     switch (type) {
       case "enum":
-        return shadow.querySelector<IqEnumSelect>("iq-enum-select")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqEnumSelect>("iq-enum-select")?.getValue() ??
+          null
+        );
       case "multi_enum":
-        return shadow.querySelector<IqMultiEnum>("iq-multi-enum")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqMultiEnum>("iq-multi-enum")?.getValue() ?? null
+        );
       case "boolean":
-        return shadow.querySelector<IqBooleanInput>("iq-boolean-input")?.getValue() ?? null;
+        return (
+          shadow
+            .querySelector<IqBooleanInput>("iq-boolean-input")
+            ?.getValue() ?? null
+        );
       case "integer":
       case "decimal":
       case "currency":
-        return shadow.querySelector<IqNumberInput>("iq-number-input")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqNumberInput>("iq-number-input")?.getValue() ??
+          null
+        );
       default:
-        return shadow.querySelector<IqTextInput>("iq-text-input")?.getValue() ?? null;
+        return (
+          shadow.querySelector<IqTextInput>("iq-text-input")?.getValue() ?? null
+        );
     }
   }
 
   private async autoSubmitIfComplete() {
     const engine = this.engine;
     if (!engine?.finished) return;
-    if (this.submitted || !this.flowUrl) return;
+    const target = this.submitUrl || this.url;
+    if (this.submitted || !target) return;
 
     try {
-      const res = await fetch(this.flowUrl, {
+      const res = await fetch(target, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeader(this.sessionToken),
+        },
         body: JSON.stringify(engine.toResult()),
       });
       if (res.ok) this.submitted = true;
@@ -806,31 +1051,8 @@ export class InquirexWidget extends LitElement {
   }
 }
 
-/* ── Auto-init from <script> tag attributes ── */
-
-function autoInit() {
-  const script = document.currentScript as HTMLScriptElement | null;
-  if (!script) return;
-
-  const flowUrl = script.getAttribute("data-flow-url");
-  const flowJson = script.getAttribute("data-flow-json");
-  const siteId = script.getAttribute("data-site-id");
-
-  if (!flowUrl && !flowJson && !siteId) return;
-
-  const widget = document.createElement("inquirex-widget");
-  if (flowUrl) widget.setAttribute("flow-url", flowUrl);
-  else if (siteId) widget.setAttribute("flow-url", `https://qualified.at/api/flows/${siteId}`);
-  if (flowJson) widget.setAttribute("flow-json", flowJson);
-  document.body.appendChild(widget);
-}
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", autoInit);
-} else {
-  autoInit();
-}
-
 declare global {
-  interface HTMLElementTagNameMap { "inquirex-widget": InquirexWidget; }
+  interface HTMLElementTagNameMap {
+    "inquirex-widget": InquirexWidget;
+  }
 }

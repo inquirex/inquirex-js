@@ -20,8 +20,8 @@ export class IqTextInput extends LitElement {
       box-sizing: border-box;
     }
     input:focus, textarea:focus {
-      border-color: var(--iq-brand, #2563eb);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--iq-brand, #2563eb) 15%, transparent);
+      border-color: var(--iq-highlight, #2563eb);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--iq-highlight, #2563eb) 15%, transparent);
     }
     input::placeholder, textarea::placeholder {
       color: var(--iq-text-muted, #a1a1aa);
@@ -33,14 +33,20 @@ export class IqTextInput extends LitElement {
   @property() placeholder = "";
   @property() value = "";
 
-  @query("input, textarea") private inputEl!: HTMLInputElement | HTMLTextAreaElement;
+  @query("input, textarea") private inputEl!:
+    | HTMLInputElement
+    | HTMLTextAreaElement;
 
   private get inputType(): string {
     switch (this.type) {
-      case "email": return "email";
-      case "phone": return "tel";
-      case "date": return "date";
-      default: return "text";
+      case "email":
+        return "email";
+      case "phone":
+        return "tel";
+      case "date":
+        return "date";
+      default:
+        return "text";
     }
   }
 
@@ -70,12 +76,18 @@ export class IqTextInput extends LitElement {
     `;
   }
 
-  focus() { this.updateComplete.then(() => this.inputEl?.focus()); }
+  focus() {
+    this.updateComplete.then(() => this.inputEl?.focus());
+  }
 
-  getValue(): string { return this.inputEl?.value?.trim() ?? ""; }
+  getValue(): string {
+    return this.inputEl?.value?.trim() ?? "";
+  }
 
   private handleInput() {
-    this.dispatchEvent(new CustomEvent("iq-input", { detail: this.inputEl.value }));
+    this.dispatchEvent(
+      new CustomEvent("iq-input", { detail: this.inputEl.value }),
+    );
   }
 
   private handleKeydown(e: KeyboardEvent) {
@@ -87,5 +99,7 @@ export class IqTextInput extends LitElement {
 }
 
 declare global {
-  interface HTMLElementTagNameMap { "iq-text-input": IqTextInput; }
+  interface HTMLElementTagNameMap {
+    "iq-text-input": IqTextInput;
+  }
 }

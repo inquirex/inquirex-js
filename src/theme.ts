@@ -2,16 +2,27 @@ import type { FlowDefinition, ThemeOverrides } from "./types.js";
 
 /** Map theme keys to their CSS custom properties. */
 const THEME_VAR_MAP: Record<keyof ThemeOverrides, string> = {
-  brand:       "--iq-brand",
-  onBrand:     "--iq-on-brand",
-  background:  "--iq-bg",
-  surface:     "--iq-surface",
-  text:        "--iq-text",
-  textMuted:   "--iq-text-muted",
-  border:      "--iq-border",
-  radius:      "--iq-radius",
-  font:        "--iq-font",
-  headerFont:  "--iq-header-font",
+  brand: "--iq-brand",
+  onBrand: "--iq-on-brand",
+  background: "--iq-bg",
+  surface: "--iq-surface",
+  text: "--iq-text",
+  textMuted: "--iq-text-muted",
+  border: "--iq-border",
+  headerBg: "--iq-header-bg",
+  headerText: "--iq-header-text",
+  headerFontSize: "--iq-header-font-size",
+  highlight: "--iq-highlight",
+  bubbleQuestionBg: "--iq-bubble-q-bg",
+  bubbleQuestionText: "--iq-bubble-q-text",
+  bubbleAnswerBg: "--iq-bubble-a-bg",
+  bubbleAnswerText: "--iq-bubble-a-text",
+  launcherBg: "--iq-launcher-bg",
+  launcherIcon: "--iq-launcher-icon",
+  radius: "--iq-radius",
+  padding: "--iq-pad",
+  font: "--iq-font",
+  headerFont: "--iq-header-font",
 };
 
 /** Default font stack we append to user-provided font values, so that
@@ -44,18 +55,29 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = /^#?([a-f0-9]{3}|[a-f0-9]{6})$/i.exec(hex.trim());
   if (!m) return null;
   let h = m[1];
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length === 3)
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
   const n = parseInt(h, 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
 /**
- * Apply a flow's theme (and brand color) to an element's inline style,
- * populating the widget's CSS custom properties. Auto-computes onBrand
- * and a darker brand shade when not explicitly provided.
+ * Apply a set of theme overrides to an element's inline style, populating the
+ * widget's CSS custom properties. Auto-computes onBrand and a darker brand
+ * shade when brand is set without them.
+ *
+ * Both the flow's `meta.theme` and the embedder's config `theme` funnel through
+ * here. Because these land as *inline* styles, they win over any host-page
+ * stylesheet rule targeting the element — which is the documented precedence:
+ * built-in defaults < host CSS < explicit theme.
  */
-export function applyTheme(el: HTMLElement, def: FlowDefinition): void {
-  const theme = def.meta?.theme;
+export function applyThemeOverrides(
+  el: HTMLElement,
+  theme: ThemeOverrides | undefined,
+): void {
   if (!theme) return;
 
   const brand = sanitize(theme.brand);
@@ -82,9 +104,16 @@ export function applyTheme(el: HTMLElement, def: FlowDefinition): void {
   }
 }
 
+/**
+ * Apply a flow definition's `meta.theme` to an element. Thin wrapper over
+ * {@link applyThemeOverrides} kept for the flow-load call site.
+ */
+export function applyTheme(el: HTMLElement, def: FlowDefinition): void {
+  applyThemeOverrides(el, def.meta?.theme);
+}
+
 /** Trim whitespace and strip stray trailing semicolons — a common paste-error. */
 function sanitize(v: unknown): string {
   if (typeof v !== "string") return "";
   return v.replace(/[\s;]+$/, "").trim();
 }
-

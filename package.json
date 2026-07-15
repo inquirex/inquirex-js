@@ -1,27 +1,49 @@
 {
   "name": "inquirex-js",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Embeddable copilot-style questionnaire widget powered by Inquirex flow definitions",
   "type": "module",
-  "main": "dist/inquirex.js",
+  "main": "dist/inquirex.mjs",
+  "module": "dist/inquirex.mjs",
+  "browser": "dist/inquirex.js",
+  "unpkg": "dist/inquirex.js",
+  "jsdelivr": "dist/inquirex.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/inquirex.mjs",
+      "default": "./dist/inquirex.mjs"
+    },
+    "./inquirex.js": "./dist/inquirex.js",
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist"
   ],
+  "sideEffects": [
+    "dist/inquirex.js",
+    "dist/inquirex.mjs"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build && tsc",
+    "prepublishOnly": "bun run build && bun run test",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
     "clean": "rm -rvf dist node_modules; find . -name .DS_Store -delete -print"
   },
   "dependencies": {
     "lit": "^3.2.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.3",
     "@speed-highlight/core": "1.2.15",
     "@vitest/coverage-v8": "4.1.4",
     "typescript": "^5.8.0",
@@ -32,6 +54,10 @@
   "author": "Konstantin Gredeskoul <kigster@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/flowengine-rb/inquirex-js"
+    "url": "git+https://github.com/inquirex/inquirex-js.git"
+  },
+  "homepage": "https://github.com/inquirex/inquirex-js",
+  "bugs": {
+    "url": "https://github.com/inquirex/inquirex-js/issues"
   }
 }

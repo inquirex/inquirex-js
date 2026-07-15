@@ -6,16 +6,14 @@ import type {
   HistoryEntry,
   AccumulationShape,
   Totals,
+  ExtractResponse,
 } from "./types.js";
 
 /**
  * Evaluates a serialized rule AST against collected answers.
  * Port of the Ruby Inquirex::Evaluator.
  */
-export function evaluateRule(
-  rule: RuleDefinition,
-  answers: Answers,
-): boolean {
+export function evaluateRule(rule: RuleDefinition, answers: Answers): boolean {
   switch (rule.op) {
     case "equals":
       return answers[rule.field] === rule.value;
@@ -30,12 +28,12 @@ export function evaluateRule(
 
     case "greater_than": {
       const num = Number(answers[rule.field]);
-      return !isNaN(num) && num > rule.value;
+      return !Number.isNaN(num) && num > rule.value;
     }
 
     case "less_than": {
       const num = Number(answers[rule.field]);
-      return !isNaN(num) && num < rule.value;
+      return !Number.isNaN(num) && num < rule.value;
     }
 
     case "not_empty": {
@@ -159,7 +157,8 @@ export class FlowEngine {
 
   private applyAccumulations(step: StepDefinition, answer: unknown): void {
     for (const [name, shape] of Object.entries(step.accumulate ?? {})) {
-      this.totals[name] = (this.totals[name] ?? 0) + accumulationContribution(shape, answer);
+      this.totals[name] =
+        (this.totals[name] ?? 0) + accumulationContribution(shape, answer);
     }
   }
 
@@ -220,6 +219,63 @@ export class FlowEngine {
   /** Returns true if the current step needs a server round-trip. */
   get currentStepRequiresServer(): boolean {
     return !!this.currentStep?.requires_server;
+  }
+
+  /** Returns true if the current step is a server-side `extract` (alias
+   *  `clarify`): it collects no user input and must round-trip to the server. */
+  get currentStepIsExtract(): boolean {
+    const verb = this.currentStep?.verb;
+    return verb === "extract" || verb === "clarify";
+  }
+
+  /**
+   * Apply structured answers returned by the server for an `extract` step,
+   * then move to the server-chosen `next` step. Downstream steps guarded by
+   * `skip_if: not_empty(field)` auto-skip for every field the server filled —
+   * this is what collapses a long form into a short one.
+   *
+   * Only non-nullish fields are merged, so a field the model could not
+   * determine is left unset and its question is still asked.
+   */
+  applyExtraction(fields: Answers, next?: string | null): void {
+    for (const [key, value] of Object.entries(fields ?? {})) {
+      if (value !== undefined && value !== null) {
+        this.answers[key] = value;
+      }
+    }
+
+    if (next && this.definition.steps[next]) {
+      this._currentStepId = next;
+      this.skipIfNeeded();
+    } else {
+      // No usable target from the server — fall back to the step's own
+      // transitions so the flow still advances.
+      this.advance();
+    }
+  }
+
+  /**
+   * Fallback when an `extract` round-trip fails (network error, timeout, non-2xx,
+   * or `status: "error"`). Advances past the server step with no pre-filled
+   * answers, so every downstream question is asked normally. The flow never
+   * breaks on an LLM failure — it degrades to a plain form.
+   */
+  failExtraction(): void {
+    this.advance();
+  }
+
+  /**
+   * Interpret a raw `/extract` response and apply it. A well-formed response
+   * (object, `status` not `"error"`) merges its answers and jumps to `next`;
+   * anything malformed or errored degrades to {@link failExtraction}. This is
+   * the single decision point the widget delegates to after a 2xx fetch.
+   */
+  applyExtractResponse(data: ExtractResponse | null | undefined): void {
+    if (data && typeof data === "object" && data.status !== "error") {
+      this.applyExtraction(data.answers ?? {}, data.next ?? null);
+    } else {
+      this.failExtraction();
+    }
   }
 
   /** Build the final result payload. */

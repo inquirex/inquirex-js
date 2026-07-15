@@ -20,14 +20,14 @@ export class IqBooleanInput extends LitElement {
       user-select: none;
     }
     button:hover {
-      border-color: color-mix(in srgb, var(--iq-brand, #2563eb) 50%, var(--iq-border, #d4d4d8));
-      background: color-mix(in srgb, var(--iq-brand, #2563eb) 4%, var(--iq-surface, #fff));
+      border-color: color-mix(in srgb, var(--iq-highlight, #2563eb) 50%, var(--iq-border, #d4d4d8));
+      background: color-mix(in srgb, var(--iq-highlight, #2563eb) 4%, var(--iq-surface, #fff));
     }
     button:active { transform: scale(0.97); }
     button[data-selected] {
-      border-color: var(--iq-brand, #2563eb);
-      background: color-mix(in srgb, var(--iq-brand, #2563eb) 10%, var(--iq-surface, #fff));
-      color: var(--iq-brand, #2563eb);
+      border-color: var(--iq-highlight, #2563eb);
+      background: color-mix(in srgb, var(--iq-highlight, #2563eb) 10%, var(--iq-surface, #fff));
+      color: var(--iq-highlight, #2563eb);
       font-weight: 600;
     }
   `;
@@ -49,7 +49,9 @@ export class IqBooleanInput extends LitElement {
     `;
   }
 
-  getValue(): boolean | null { return this.selected; }
+  getValue(): boolean | null {
+    return this.selected;
+  }
 
   private select(value: boolean) {
     this.selected = value;
@@ -59,5 +61,7 @@ export class IqBooleanInput extends LitElement {
 }
 
 declare global {
-  interface HTMLElementTagNameMap { "iq-boolean-input": IqBooleanInput; }
+  interface HTMLElementTagNameMap {
+    "iq-boolean-input": IqBooleanInput;
+  }
 }
