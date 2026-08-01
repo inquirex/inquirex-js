@@ -1,5 +1,5 @@
 {
-  "name": "@kigster/inquirex-js",
+  "name": "inquirex-js",
   "version": "0.8.0",
   "description": "Embeddable copilot-style questionnaire widget powered by Inquirex flow definitions",
   "type": "module",
