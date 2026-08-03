@@ -1,5 +1,5 @@
 user=inquirex
-project=inquirex-js
+project=inquirex-widget
 exclude-labels=duplicate,question,invalid,wontfix
 issues=false
 add-sections={"security":{"prefix":"### Security","labels":["security"]}}

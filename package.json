@@ -57,10 +57,10 @@
   "author": "Konstantin Gredeskoul <kigster@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/inquirex/inquirex-js.git"
+    "url": "git+https://github.com/inquirex/inquirex-widget.git"
   },
-  "homepage": "https://github.com/inquirex/inquirex-js",
+  "homepage": "https://github.com/inquirex/inquirex-widget",
   "bugs": {
-    "url": "https://github.com/inquirex/inquirex-js/issues"
+    "url": "https://github.com/inquirex/inquirex-widget/issues"
   }
 }

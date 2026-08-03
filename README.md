@@ -1,6 +1,6 @@
-# inquirex-js
+# inquirex-widget
 
-Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/flowengine-rb/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs the collected answers back to your server.
+Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/inquirex/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs the collected answers back to your server.
 
 **53KB** single-file bundle (16KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles **and** markup completely, and every value from the flow definition is rendered as text, never HTML — see [Security](#security).
 
@@ -40,7 +40,7 @@ Pure branching (rules, `skip_if`, accumulators) is evaluated client-side, so no 
 
 #### Authoring the flow: Ruby DSL → JSON
 
-Write the form once in the Inquirex Ruby DSL, then convert it to the JSON the widget consumes with the **`inquirex` CLI** (shipped by the [`inquirex-tty`](https://github.com/flowengine-rb) gem):
+Write the form once in the Inquirex Ruby DSL, then convert it to the JSON the widget consumes with the **`inquirex` CLI** (shipped by the [`inquirex-tty`](https://github.com/inquirex/inquirex-tty) gem):
 
 ```bash
 gem install inquirex-tty

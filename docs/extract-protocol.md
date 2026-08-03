@@ -1,6 +1,6 @@
 # Inquirex `extract` Protocol (v1)
 
-The wire contract between the **inquirex-js** widget and **your server** for the
+The wire contract between the **inquirex-widget** package and **your server** for the
 one LLM-powered verb that ships in v1: **`extract`**.
 
 `extract` collects unstructured free text in a normal `ask` step, then — in the
