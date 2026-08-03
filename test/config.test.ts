@@ -10,8 +10,7 @@ import type { InquirexConfig } from "../src/types.js";
 /** A minimal stand-in for the loading <script>, driven by a plain attribute map. */
 function fakeScript(attrs: Record<string, string>): HTMLScriptElement {
   return {
-    getAttribute: (name: string) =>
-      name in attrs ? attrs[name] : null,
+    getAttribute: (name: string) => (name in attrs ? attrs[name] : null),
   } as unknown as HTMLScriptElement;
 }
 
@@ -106,7 +105,10 @@ describe("resolveConfig — normalization", () => {
   });
 
   it("prefers an explicit url over a site id", () => {
-    const cfg = resolveConfig(null, { siteId: "abc", url: "https://own.test/f" });
+    const cfg = resolveConfig(null, {
+      siteId: "abc",
+      url: "https://own.test/f",
+    });
     expect(cfg.url).toBe("https://own.test/f");
   });
 
