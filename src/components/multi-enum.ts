@@ -1,4 +1,4 @@
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { Option } from "../types.js";
 
@@ -49,7 +49,20 @@ export class IqMultiEnum extends LitElement {
   `;
 
   @property({ type: Array }) options: Option[] = [];
+  /** Choices to render pre-checked — LLM extraction suggestions (option form
+   *  values). The user can still toggle them off or add more. */
+  @property({ type: Array }) initial: string[] = [];
   @state() private selected: Set<string> = new Set();
+
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (
+      changed.has("initial") &&
+      this.selected.size === 0 &&
+      this.initial.length > 0
+    ) {
+      this.selected = new Set(this.initial);
+    }
+  }
 
   render() {
     return html`

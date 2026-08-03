@@ -792,10 +792,15 @@ export class InquirexWidget extends LitElement {
           @iq-submit=${this.handleSubmitInput}
         ></iq-enum-select>`;
 
-      case "multi_enum":
+      case "multi_enum": {
+        // LLM-extracted values arrive as suggestions: pre-check them but
+        // still ask, so the user confirms and can extend the selection.
+        const suggested =
+          this.engine?.suggestionFor(this.engine.currentStepId) ?? [];
         return html`
           <iq-multi-enum
             .options=${step.options ?? []}
+            .initial=${suggested}
             @iq-input=${() => {
               this.inputValid = true;
             }}
@@ -803,10 +808,11 @@ export class InquirexWidget extends LitElement {
           <button
             class="continue-btn"
             style="margin-top:10px"
-            ?disabled=${!this.inputValid}
+            ?disabled=${!this.inputValid && suggested.length === 0}
             @click=${this.handleSubmitInput}
           >Continue</button>
         `;
+      }
 
       case "boolean":
         return html`<iq-boolean-input
