@@ -1,7 +1,7 @@
-# inquirex-js task runner — powered by bun. Run `just` to list recipes.
+# inquirex-widget task runner — powered by bun. Run `just` to list recipes.
 
 version := `jq .version < package.json | tr -d '"'`
-repo    := "https://github.com/inquirex/inquirex-js"
+repo    := "https://github.com/inquirex/inquirex-widget"
 
 # Show available recipes
 default:
