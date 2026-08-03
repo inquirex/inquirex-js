@@ -14,7 +14,7 @@ export default defineConfig({
       entry: resolve(__dirname, "src/index.ts"),
       name: "Inquirex",
       // inquirex.js  -> IIFE for <script src> embedding (CDN, unpkg, jsdelivr)
-      // inquirex.mjs -> ESM for `import { FlowEngine } from "inquirex-js"`
+      // inquirex.mjs -> ESM for `import { FlowEngine } from "inquirex-widget"`
       fileName: (format) =>
         format === "iife" ? "inquirex.js" : "inquirex.mjs",
       formats: ["iife", "es"],
