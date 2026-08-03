@@ -76,7 +76,11 @@ if (typeof document !== "undefined") {
   }
 }
 
-export { FlowEngine, evaluateRule, accumulationContribution } from "./engine.js";
+export {
+  FlowEngine,
+  evaluateRule,
+  accumulationContribution,
+} from "./engine.js";
 export { runServerVerb, type ServerVerbConfig } from "./server-verb.js";
 export {
   applyTheme,
