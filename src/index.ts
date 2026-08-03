@@ -8,7 +8,7 @@
 // Two ways to embed:
 //   1. <script src> drop-in — reads `data-inquirex-*` off its own tag and
 //      auto-mounts (see `autoMount` below).
-//   2. `import { mount } from "inquirex-js"` — call `mount(config)` yourself.
+//   2. `import { mount } from "inquirex-widget"` — call `mount(config)` yourself.
 // Both funnel through the same `resolveConfig` precedence.
 
 import "./widget.js";
