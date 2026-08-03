@@ -95,7 +95,7 @@ describe("currentStepIsExtract", () => {
 });
 
 describe("applyExtraction — the happy path", () => {
-  it("merges fields and skips every question they answer", () => {
+  it("skips filled single-value questions; multi-selects become pre-checked suggestions", () => {
     const engine = atExtractStep();
     engine.applyExtraction(
       {
@@ -107,11 +107,19 @@ describe("applyExtraction — the happy path", () => {
       "filing_status",
     );
 
-    // All four extractable questions were skipped; only client_contact remains.
-    expect(engine.currentStepId).toBe("client_contact");
+    // Single-value questions were skipped; the multi-select is still asked,
+    // pre-checked with the extraction (a hint the user confirms and extends).
+    expect(engine.currentStepId).toBe("income_types");
     expect(engine.finished).toBe(false);
     expect(engine.answers.filing_status).toBe("married_filing_jointly");
     expect(engine.answers.dependents).toBe(2);
+    expect("income_types" in engine.answers).toBe(false);
+    expect(engine.suggestionFor("income_types")).toEqual(["W2", "1099"]);
+
+    // Confirming the suggestion resumes the skip cascade.
+    engine.answer(["W2", "1099"]);
+    expect(engine.currentStepId).toBe("client_contact");
+    expect(engine.suggestionFor("income_types")).toBeNull();
   });
 
   it("only skips the questions it could fill; the rest are still asked", () => {
@@ -142,6 +150,130 @@ describe("applyExtraction — the happy path", () => {
     engine.applyExtraction({ state_filing: "" }, "filing_status");
     // Walks from filing_status; nothing was truly filled, so it asks filing_status.
     expect(engine.currentStepId).toBe("filing_status");
+  });
+});
+
+// Regression suite for the tax-intake bug: "I wrote I am a US citizen, the
+// LLM returned us_person, and the wrong option got selected instead of the
+// question skipping; my W2s came back but were not pre-checked."
+//
+// The flow deliberately declares NO skip_if rules — `prompt :auto` extraction
+// must skip answered single-selects anyway — and its options carry friendly
+// labels distinct from the form values, because matching must resolve to the
+// form VALUE, never the label.
+describe("applyExtraction — option canonicalization and auto-skip (no skip_if)", () => {
+  const taxFlow = (): FlowDefinition => ({
+    id: "tax",
+    version: "1.0.0",
+    start: "describe",
+    steps: {
+      describe: {
+        verb: "ask",
+        type: "text",
+        question: "Describe your situation.",
+        transitions: [{ to: "extracted" }],
+      },
+      extracted: {
+        verb: "extract",
+        requires_server: true,
+        transitions: [{ to: "residency_status", requires_server: true }],
+      },
+      residency_status: {
+        verb: "ask",
+        type: "enum",
+        question: "Residency?",
+        options: [
+          { value: "us_person", label: "US citizen or permanent resident" },
+          { value: "resident", label: "Resident alien (substantial presence)" },
+        ],
+        transitions: [{ to: "income_types" }],
+      },
+      income_types: {
+        verb: "ask",
+        type: "multi_enum",
+        question: "Income types?",
+        options: [
+          { value: "W2", label: "W-2 wages" },
+          { value: "crypto", label: "Cryptocurrency" },
+        ],
+        transitions: [{ to: "done" }],
+      },
+      done: { verb: "say", text: "Thanks!" },
+    },
+  });
+
+  function atTaxExtract(): FlowEngine {
+    const engine = new FlowEngine(taxFlow());
+    engine.answer("I am a US citizen with 2 W2s.");
+    return engine;
+  }
+
+  it("skips an extracted single-select even though the flow has no skip_if", () => {
+    const engine = atTaxExtract();
+    engine.applyExtraction(
+      { residency_status: "us_person" },
+      "residency_status",
+    );
+    expect(engine.answers.residency_status).toBe("us_person");
+    expect(engine.currentStepId).toBe("income_types");
+  });
+
+  it("canonicalizes a case variant to the form value", () => {
+    const engine = atTaxExtract();
+    engine.applyExtraction(
+      { residency_status: "US_PERSON" },
+      "residency_status",
+    );
+    expect(engine.answers.residency_status).toBe("us_person");
+  });
+
+  it("canonicalizes a label answer to the form value — never the label", () => {
+    const engine = atTaxExtract();
+    engine.applyExtraction(
+      { residency_status: "US citizen or permanent resident" },
+      "residency_status",
+    );
+    expect(engine.answers.residency_status).toBe("us_person");
+    expect(engine.currentStepId).toBe("income_types");
+  });
+
+  it("drops a value matching neither value nor label, and still asks", () => {
+    const engine = atTaxExtract();
+    engine.applyExtraction(
+      { residency_status: "alien overlord" },
+      "residency_status",
+    );
+    expect("residency_status" in engine.answers).toBe(false);
+    expect(engine.currentStepId).toBe("residency_status");
+  });
+
+  it("canonicalizes multi-select suggestions entry by entry, dropping junk", () => {
+    const engine = atTaxExtract();
+    engine.applyExtraction(
+      {
+        residency_status: "us_person",
+        income_types: ["W-2 wages", "CRYPTO", "bitcoin mining"],
+      },
+      "residency_status",
+    );
+    expect(engine.currentStepId).toBe("income_types");
+    expect(engine.suggestionFor("income_types")).toEqual(["W2", "crypto"]);
+    expect("income_types" in engine.answers).toBe(false);
+  });
+
+  it("records no suggestion when every multi-select entry is junk", () => {
+    const engine = atTaxExtract();
+    engine.applyExtraction(
+      { income_types: ["bitcoin mining"] },
+      "residency_status",
+    );
+    expect(engine.suggestionFor("income_types")).toBeNull();
+  });
+
+  it("stores schema-only fields with no matching step verbatim", () => {
+    const engine = atTaxExtract();
+    engine.applyExtraction({ confidence: 0.87 }, "residency_status");
+    expect(engine.answers.confidence).toBe(0.87);
   });
 });
 
@@ -309,7 +441,9 @@ describe("runServerVerb — the fetch round-trip", () => {
     });
     await runServerVerb(engine, { llmUrl: "x", fetchFn: fn });
     expect(engine.answers.filing_status).toBe("single");
-    expect(engine.currentStepId).toBe("client_contact"); // all four skipped
+    // Single-value questions skipped; the multi-select is asked pre-checked.
+    expect(engine.currentStepId).toBe("income_types");
+    expect(engine.suggestionFor("income_types")).toEqual(["W2"]);
   });
 
   it("falls back on a non-2xx response (no answers merged)", async () => {

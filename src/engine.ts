@@ -58,6 +58,37 @@ function isCollecting(verb: string): boolean {
 }
 
 /**
+ * Canonicalizes a raw extracted value against a step's options: an exact
+ * form-value match wins, then a case-insensitive value match, then a
+ * case-insensitive label match — LLMs (and humans) often answer with the
+ * friendly label ("US citizen or permanent resident") when the form value is
+ * the canonical key ("us_person"). Matching always resolves TO the form
+ * value, never the label. Steps without options return the value unchanged;
+ * an unmatchable value returns null rather than polluting answers with junk
+ * that would satisfy not_empty rules and pre-select the wrong option.
+ *
+ * Port of the Ruby Inquirex::Node#resolve_option.
+ */
+export function canonicalOption(step: StepDefinition, raw: unknown): unknown {
+  const opts = step.options;
+  if (!opts || opts.length === 0) return raw;
+  if (raw === null || raw === undefined) return null;
+
+  const candidate = String(raw);
+  const exact = opts.find((o) => o.value === candidate);
+  if (exact) return exact.value;
+
+  const lc = candidate.toLowerCase();
+  const ci = opts.find((o) => o.value.toLowerCase() === lc);
+  if (ci) return ci.value;
+
+  const byLabel = opts.find((o) => o.label?.toLowerCase() === lc);
+  if (byLabel) return byLabel.value;
+
+  return null;
+}
+
+/**
  * Computes a single accumulation's contribution from the answer.
  * Mirrors Inquirex::Accumulation#contribution in Ruby.
  */
@@ -107,6 +138,10 @@ export class FlowEngine {
   readonly answers: Answers = {};
   readonly history: HistoryEntry[] = [];
   readonly totals: Totals;
+  /** Multi-select prefill hints from an `extract` step: the question is
+   *  still asked with these choices pre-checked, so the user can confirm and
+   *  extend. Mirrors the Ruby Engine's `suggestions` channel. */
+  readonly suggestions: Record<string, string[]> = {};
 
   private _currentStepId: string;
   private _finished = false;
@@ -142,6 +177,11 @@ export class FlowEngine {
     return Object.keys(this.definition.steps).length;
   }
 
+  /** The prefill suggestion for a step, or null when none was recorded. */
+  suggestionFor(stepId: string): string[] | null {
+    return this.suggestions[stepId] ?? null;
+  }
+
   /** Submit an answer for the current collecting step and advance. */
   answer(value: unknown): void {
     const step = this.currentStep;
@@ -150,6 +190,7 @@ export class FlowEngine {
     }
 
     this.answers[this._currentStepId] = value;
+    delete this.suggestions[this._currentStepId];
     this.applyAccumulations(step, value);
     this.history.push({ stepId: this._currentStepId, step, answer: value });
     this.advance();
@@ -169,18 +210,18 @@ export class FlowEngine {
     this.advance();
   }
 
+  /** First transition whose rule passes (an unconditional transition always
+   *  passes) — the same in-order resolution the Ruby Node#next_step_id uses. */
+  private resolveNext(step: StepDefinition): string | null {
+    for (const t of step.transitions ?? []) {
+      if (!t.rule || evaluateRule(t.rule, this.answers)) return t.to;
+    }
+    return null;
+  }
+
   /** Resolve the next step via transition rules and move there. */
   private advance(): void {
-    const step = this.currentStep;
-    const transitions = step.transitions ?? [];
-
-    let nextId: string | null = null;
-    for (const t of transitions) {
-      if (!t.rule || evaluateRule(t.rule, this.answers)) {
-        nextId = t.to;
-        break;
-      }
-    }
+    const nextId = this.resolveNext(this.currentStep);
 
     if (!nextId || !this.definition.steps[nextId]) {
       this._finished = true;
@@ -191,7 +232,11 @@ export class FlowEngine {
     this.skipIfNeeded();
   }
 
-  /** Auto-skip steps whose skip_if rule evaluates to true. */
+  /** Auto-skip steps whose skip_if rule evaluates to true, and collecting
+   *  steps whose answer already exists (prefilled by an `extract` step) —
+   *  an answered question is never asked again. Transitions are resolved
+   *  with rule evaluation, so a skipped step still branches correctly on
+   *  the answer that skipped it. */
   private skipIfNeeded(): void {
     let guard = 100;
     while (guard-- > 0) {
@@ -200,19 +245,18 @@ export class FlowEngine {
         this._finished = true;
         return;
       }
-      if (step.skip_if && evaluateRule(step.skip_if, this.answers)) {
-        // Skip this step — advance via its default transition
-        const transitions = step.transitions ?? [];
-        const next = transitions[transitions.length - 1];
-        if (next) {
-          this._currentStepId = next.to;
-        } else {
-          this._finished = true;
-          return;
-        }
-      } else {
+      const answered =
+        isCollecting(step.verb) &&
+        this.answers[this._currentStepId] !== undefined;
+      const elided = !!step.skip_if && evaluateRule(step.skip_if, this.answers);
+      if (!answered && !elided) return;
+
+      const nextId = this.resolveNext(step);
+      if (!nextId || !this.definition.steps[nextId]) {
+        this._finished = true;
         return;
       }
+      this._currentStepId = nextId;
     }
   }
 
@@ -230,16 +274,39 @@ export class FlowEngine {
 
   /**
    * Apply structured answers returned by the server for an `extract` step,
-   * then move to the server-chosen `next` step. Downstream steps guarded by
-   * `skip_if: not_empty(field)` auto-skip for every field the server filled —
-   * this is what collapses a long form into a short one.
+   * then move to the server-chosen `next` step. Every filled single-select
+   * question is treated as answered and auto-skips when reached — this is
+   * what collapses a long form into a short one, with or without `skip_if`
+   * rules in the flow.
    *
-   * Only non-nullish fields are merged, so a field the model could not
-   * determine is left unset and its question is still asked.
+   * Values for option steps are canonicalized against the option FORM
+   * VALUES (case-insensitive, with a label fallback) via
+   * {@link canonicalOption}; anything unmatchable is dropped so the model
+   * can never pre-select the wrong option. Multi-select extractions are
+   * hints, not facts: they land in {@link suggestions} (pre-checked in the
+   * UI, question still asked), never directly in answers. Nullish and empty
+   * fields are ignored, so an "unknown" extraction leaves its question
+   * asked.
    */
   applyExtraction(fields: Answers, next?: string | null): void {
     for (const [key, value] of Object.entries(fields ?? {})) {
-      if (value !== undefined && value !== null) {
+      if (value === undefined || value === null) continue;
+      if (typeof value === "string" && value.trim() === "") continue;
+      if (Array.isArray(value) && value.length === 0) continue;
+      if (this.answers[key] !== undefined) continue;
+
+      const step = this.definition.steps[key];
+      if (step && isCollecting(step.verb) && step.type === "multi_enum") {
+        const resolved = (Array.isArray(value) ? value : [value])
+          .map((entry) => canonicalOption(step, entry))
+          .filter((v): v is string => typeof v === "string");
+        if (resolved.length > 0) this.suggestions[key] = resolved;
+      } else if (step && isCollecting(step.verb)) {
+        const resolved = canonicalOption(step, value);
+        if (resolved !== null) this.answers[key] = resolved;
+      } else {
+        // Schema-only fields with no matching step (e.g. a confidence
+        // score) are stored verbatim so rules can still read them.
         this.answers[key] = value;
       }
     }
