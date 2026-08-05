@@ -2,7 +2,7 @@
 
 Embeddable copilot-style questionnaire widget. Loads an [Inquirex](https://github.com/flowengine-rb/inquirex) flow definition as JSON, walks users through a branching form inside a floating chat panel, and POSTs the collected answers back to your server.
 
-**53KB** single-file bundle (16KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles **and** markup completely, and every value from the flow definition is rendered as text, never HTML — see [Security](#security).
+**108KB** single-file bundle (32KB gzipped). Zero framework dependencies on the host page. Shadow DOM isolates styles **and** markup completely, and every value from the flow definition is rendered as text, never HTML — see [Security](#security). The one exception is the `summarize` step's markdown output, which is parsed and then filtered through a strict element allowlist; see [Summaries](#summaries).
 
 ## Three ways to use it
 
@@ -250,6 +250,34 @@ The `theme` object merges key-by-key under the same rule. Full details — the
 baked bundle, the `mount()` API, launch/position — are in
 **[docs/embedding.md](docs/embedding.md)**. Visual knobs are under
 [Theming](#theming).
+
+## Summaries
+
+A flow may close with a `summarize` step ([inquirex-llm](https://github.com/inquirex/inquirex-llm)). Instead of a "thank you" screen, the widget shows a multi-paragraph summary of the session, with **Close** and **Print** buttons.
+
+The summary is generated server-side from the session transcript — everything the user was shown and every answer they gave — so it works for a flow that mostly *explains* things and collects almost no answers, which a summary of the answers hash cannot.
+
+```json
+{ "verb": "summarize", "requires_server": true }
+```
+
+The widget POSTs to the same LLM endpoint with `?verb=summarize` and expects:
+
+```json
+{ "status": "ok", "summary": "## What we covered\n\nYou asked about…" }
+```
+
+`summary` is markdown. Anything else — non-2xx, timeout, `status: "error"`, an empty summary, or no LLM endpoint configured — falls back to the ordinary completion screen. A summary failure never blocks the user from finishing.
+
+**Print** opens a new window containing a self-contained, print-formatted document: serif body text at a readable measure, headings that do not orphan, code blocks that do not split across pages, and link URLs printed after their text. It is a separate window rather than a `@media print` stylesheet because the widget renders inside a Shadow DOM — a host page's print styles cannot reach it, and printing in place would print the host page's navigation and footer around a summary squeezed into a floating panel.
+
+### How summary markdown is rendered safely
+
+This is the one place the widget emits HTML rather than text, and it is the least trustworthy string it handles: model output, generated from a transcript containing whatever the user typed. Markdown is parsed with [marked](https://marked.js.org), then the **parsed DOM is walked against a strict allowlist** before anything is shown — headings, lists, blockquotes, emphasis, code, tables, and links only.
+
+Everything else is removed or unwrapped to its text: no `<script>`, no `<iframe>`, no event handlers, no `style` attributes, no `javascript:` or `data:` URLs. Surviving links get `target="_blank"` and `rel="noopener noreferrer nofollow"`. The print document runs through the same allowlist, so it can never contain something the on-screen summary refused.
+
+The allowlist is enforced against the tree the browser actually built, not by scrubbing an HTML string with regexes.
 
 ## Security
 
