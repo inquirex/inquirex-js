@@ -13,9 +13,15 @@ export type DataType =
   | "phone";
 
 /** Display verbs produce no user input; collecting verbs do.
- *  `extract` (alias `clarify`) is a server-processing verb: it collects no
- *  input directly — the widget round-trips to the server, which returns
- *  structured answers that pre-fill (and thereby skip) later steps. */
+ *
+ *  Two verbs are server-processing — they collect no input directly and
+ *  round-trip to the server instead:
+ *
+ *  - `extract` (alias `clarify`) returns structured answers that pre-fill
+ *    (and thereby skip) later steps.
+ *  - `summarize` returns markdown prose closing the flow. It is always the
+ *    last step, and its result is shown to the user rather than stored as an
+ *    answer. */
 export type Verb =
   | "ask"
   | "confirm"
@@ -24,7 +30,8 @@ export type Verb =
   | "btw"
   | "warning"
   | "extract"
-  | "clarify";
+  | "clarify"
+  | "summarize";
 
 /** A single option in an enum / multi_enum step. */
 export interface Option {
@@ -276,6 +283,18 @@ export interface ExtractResponse {
   status?: "ok" | "partial" | "error";
   answers?: Answers;
   next?: string | null;
+  meta?: Record<string, unknown>;
+}
+
+/** Shape of a `POST {llm-prefix}?verb=summarize` response.
+ *
+ *  `summary` is markdown, generated server-side from the session transcript.
+ *  Every field is optional so a malformed or errored response degrades to the
+ *  ordinary completion screen rather than blocking the user. */
+export interface SummaryResponse {
+  step?: string;
+  status?: "ok" | "error";
+  summary?: string;
   meta?: Record<string, unknown>;
 }
 
