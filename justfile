@@ -3,6 +3,11 @@
 version := `jq .version < package.json | tr -d '"'`
 repo    := "https://github.com/inquirex/inquirex-widget"
 
+# The published package page, opened after a successful `just publish`. Read
+# from package.json rather than hardcoded, so the rename that took this package
+# from @kigster/inquirex-js to inquirex-widget cannot leave a stale link here.
+pkg_url := "https://www.npmjs.com/package/" + `jq -r .name < package.json`
+
 # Show available recipes
 default:
     @just --list
@@ -59,8 +64,8 @@ version increment="patch":
 whoami:
     @npm whoami
 
-# Publish to npm, logging in first if needed (2FA: `just publish 123456`)
-publish otp="":
+# Publish to npm, logging in first if needed. 2FA code comes from 1Password.
+publish:
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -80,12 +85,24 @@ publish otp="":
       echo "npm: authenticated as $(npm whoami)"
     fi
 
+    # Read the current npm 2FA code from 1Password. The `|| true` is load-bearing:
+    # under `set -e` a failed `op read` (not signed in, item renamed, op missing)
+    # would abort the recipe before the fallback below could ever run.
+    otp=$(/opt/homebrew/bin/op read \
+      "op://open-source-repos/npmjs/one-time password?attribute=otp" 2>/dev/null || true)
+
     # `prepublishOnly` rebuilds and runs the full test suite before packing.
-    if [ -n "{{ otp }}" ]; then
-      bun publish --otp "{{ otp }}"
+    if [ -n "${otp}" ]; then
+      bun publish --otp "${otp}"
     else
+      echo "npm: no OTP from 1Password — bun will prompt if 2FA is required."
       bun publish
     fi
+
+    # Only reachable when the publish succeeded: `set -e` aborts the recipe on
+    # a non-zero exit, so the page never opens for a release that failed.
+    echo "published {{ pkg_url }}"
+    open "{{ pkg_url }}" 2>/dev/null || xdg-open "{{ pkg_url }}" 2>/dev/null || true
 
 # Tag v{{ version }}, publish the GH release, & refresh the Homebrew tap.
 release:
