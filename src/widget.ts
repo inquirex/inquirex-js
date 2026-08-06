@@ -2,6 +2,8 @@ import { LitElement, html, css, nothing, type PropertyValues } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { FlowEngine } from "./engine.js";
+import { renderMarkdown } from "./markdown.js";
+import { printSummary } from "./print.js";
 import { runServerVerb } from "./server-verb.js";
 import { applyTheme, applyThemeOverrides } from "./theme.js";
 import type {
@@ -436,6 +438,105 @@ export class InquirexWidget extends LitElement {
     }
     .complete-text { font-size: 14px; color: var(--iq-text-muted); }
 
+    /* ── Summary (the closing screen for a summarize flow) ── */
+    .summary { padding: 4px 2px 8px; }
+    .summary-body {
+      font-size: 14px;
+      line-height: 1.65;
+      color: var(--iq-text);
+      overflow-wrap: break-word;
+    }
+    .summary-body > :first-child { margin-top: 0; }
+    .summary-body > :last-child { margin-bottom: 0; }
+    .summary-body h1,
+    .summary-body h2,
+    .summary-body h3,
+    .summary-body h4 {
+      margin: 1.35em 0 0.5em;
+      line-height: 1.3;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+    .summary-body h1 { font-size: 1.28em; }
+    .summary-body h2 { font-size: 1.16em; }
+    .summary-body h3 { font-size: 1.05em; }
+    .summary-body h4 { font-size: 1em; color: var(--iq-text-muted); }
+    .summary-body p { margin: 0 0 0.85em; }
+    .summary-body ul, .summary-body ol { margin: 0 0 0.9em; padding-left: 1.35em; }
+    .summary-body li { margin: 0.28em 0; }
+    .summary-body blockquote {
+      margin: 1em 0;
+      padding: 0.15em 0 0.15em 0.9em;
+      border-left: 3px solid color-mix(in srgb, var(--iq-brand) 45%, transparent);
+      color: var(--iq-text-muted);
+    }
+    .summary-body code {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.86em;
+      background: color-mix(in srgb, var(--iq-text) 8%, var(--iq-bg));
+      padding: 0.12em 0.36em;
+      border-radius: 4px;
+    }
+    .summary-body pre {
+      background: color-mix(in srgb, var(--iq-text) 6%, var(--iq-bg));
+      border: 1px solid color-mix(in srgb, var(--iq-text) 12%, transparent);
+      border-radius: 7px;
+      padding: 10px 12px;
+      overflow-x: auto;
+      margin: 0 0 0.9em;
+    }
+    .summary-body pre code { background: none; padding: 0; font-size: 12px; }
+    .summary-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 0.9em;
+      font-size: 13px;
+    }
+    .summary-body th, .summary-body td {
+      border: 1px solid color-mix(in srgb, var(--iq-text) 14%, transparent);
+      padding: 5px 8px;
+      text-align: left;
+    }
+    .summary-body th { background: color-mix(in srgb, var(--iq-text) 6%, var(--iq-bg)); }
+    .summary-body a { color: var(--iq-brand); }
+    .summary-body hr {
+      border: 0;
+      border-top: 1px solid color-mix(in srgb, var(--iq-text) 14%, transparent);
+      margin: 1.3em 0;
+    }
+
+    .summary-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid color-mix(in srgb, var(--iq-text) 12%, transparent);
+    }
+    .summary-btn {
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--iq-brand);
+      background: var(--iq-brand);
+      color: var(--iq-brand-contrast, #fff);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .summary-btn:hover { background: var(--iq-brand-dark); }
+    .summary-btn:active { transform: scale(0.98); }
+    .summary-btn-ghost {
+      background: transparent;
+      color: var(--iq-text-muted);
+      border-color: color-mix(in srgb, var(--iq-text) 22%, transparent);
+    }
+    .summary-btn-ghost:hover {
+      background: color-mix(in srgb, var(--iq-text) 6%, transparent);
+      color: var(--iq-text);
+    }
+
     /* ── Powered-by footer ── */
     .footer {
       padding: 8px 16px 12px;
@@ -670,7 +771,13 @@ export class InquirexWidget extends LitElement {
           ${this.error ? html`<p style="color:#dc2626">${this.error}</p>` : nothing}
           ${engine ? this.renderHistory(engine) : nothing}
           ${engine && !engine.finished ? this.renderCurrentQuestion(engine) : nothing}
-          ${engine?.finished && !this.submitted ? this.renderComplete() : nothing}
+          ${
+            engine?.finished && !this.submitted
+              ? engine.summary
+                ? this.renderSummary(engine.summary)
+                : this.renderComplete()
+              : nothing
+          }
           ${this.submitted ? this.renderSubmitted() : nothing}
         </div>
         <div class="footer"><a href="https://qualified.at" target="_blank" rel="noopener">Powered by Qualified.at</a></div>
@@ -755,7 +862,7 @@ export class InquirexWidget extends LitElement {
 
     // Server-processing step: no input control — show a thinking indicator
     // while the widget round-trips (or advances past it on fallback).
-    if (engine.currentStepIsExtract) {
+    if (engine.currentStepIsServerVerb) {
       return this.renderThinking(step);
     }
 
@@ -892,6 +999,45 @@ export class InquirexWidget extends LitElement {
     `;
   }
 
+  /**
+   * The closing screen for a flow that ended with a `summarize` step: the
+   * summary itself, then Close and Print.
+   *
+   * The markdown is rendered through {@link renderMarkdown}, which returns a
+   * sanitized DocumentFragment. It is appended as a DOM node rather than
+   * passed through lit's `unsafeHTML`, so the allowlist — not a trust
+   * assertion at the call site — is what decides what reaches the page.
+   */
+  private renderSummary(markdown: string) {
+    const body = document.createElement("div");
+    body.className = "summary-body";
+    body.appendChild(renderMarkdown(markdown));
+
+    return html`
+      <div class="summary">
+        ${body}
+        <div class="summary-actions">
+          <button class="summary-btn summary-btn-ghost" @click=${this.togglePanel}>Close</button>
+          <button class="summary-btn" @click=${this.handlePrintSummary}>Print</button>
+        </div>
+      </div>
+    `;
+  }
+
+  /** Open the summary as a print-formatted document in its own window. */
+  private handlePrintSummary() {
+    const markdown = this.engine?.summary;
+    if (!markdown) return;
+
+    const title = this.engine?.definition.meta?.title ?? "Your summary";
+    const opened = printSummary(markdown, { title });
+    if (!opened) {
+      // A popup blocker refused the window. Say so — silently doing nothing
+      // reads as a broken button.
+      this.error = "Your browser blocked the print window. Allow pop-ups for this site and try again.";
+    }
+  }
+
   private renderSubmitted() {
     return html`
       <div class="complete">
@@ -977,7 +1123,7 @@ export class InquirexWidget extends LitElement {
     const engine = this.engine;
     if (!engine) return;
 
-    while (!engine.finished && engine.currentStepIsExtract) {
+    while (!engine.finished && engine.currentStepIsServerVerb) {
       this.afterAdvance(); // show the thinking spinner
       await runServerVerb(engine, {
         llmUrl: this.llmUrl,

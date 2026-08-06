@@ -7,6 +7,7 @@ import type {
   AccumulationShape,
   Totals,
   ExtractResponse,
+  SummaryResponse,
 } from "./types.js";
 
 /**
@@ -145,6 +146,7 @@ export class FlowEngine {
 
   private _currentStepId: string;
   private _finished = false;
+  private _summary: string | null = null;
 
   constructor(definition: FlowDefinition) {
     this.definition = definition;
@@ -268,8 +270,76 @@ export class FlowEngine {
   /** Returns true if the current step is a server-side `extract` (alias
    *  `clarify`): it collects no user input and must round-trip to the server. */
   get currentStepIsExtract(): boolean {
+    if (this._finished) return false;
     const verb = this.currentStep?.verb;
     return verb === "extract" || verb === "clarify";
+  }
+
+  /** Returns true if the current step is a server-side `summarize`: the
+   *  closing step, which returns markdown prose instead of answers. */
+  get currentStepIsSummarize(): boolean {
+    if (this._finished) return false;
+    return this.currentStep?.verb === "summarize";
+  }
+
+  /** Returns true if the current step needs the LLM endpoint at all.
+   *
+   *  These three getters check {@link finished} because finishing does not
+   *  clear `_currentStepId` — the engine stays parked on the last step it
+   *  reached. Without the guard, a caller that drove a loop on
+   *  "is this a server step?" alone would never exit after a summarize step,
+   *  since summarize both is a server verb and is where the flow ends. */
+  get currentStepIsServerVerb(): boolean {
+    return this.currentStepIsExtract || this.currentStepIsSummarize;
+  }
+
+  /**
+   * Markdown summary produced by a `summarize` step, or null when the flow
+   * has none, has not reached it yet, or the call failed.
+   *
+   * Kept apart from {@link answers} on purpose: a summary is prose for the
+   * user to read, not a value any rule should branch on, and it must never be
+   * submitted back as though the user had typed it.
+   */
+  get summary(): string | null {
+    return this._summary;
+  }
+
+  /**
+   * Store the markdown a `summarize` step returned and finish the flow.
+   *
+   * `summarize` is always the last step, so there is nothing to advance to —
+   * the widget renders the summary in place of the completion screen.
+   *
+   * @param markdown the model's summary, or nothing usable
+   */
+  applySummary(markdown: unknown): void {
+    const text = typeof markdown === "string" ? markdown.trim() : "";
+    this._summary = text === "" ? null : text;
+    this._finished = true;
+  }
+
+  /**
+   * Interpret a raw summarize response. Anything malformed, errored, or empty
+   * degrades to {@link failSummary} — a missing summary must not block the
+   * user from finishing.
+   */
+  applySummaryResponse(data: SummaryResponse | null | undefined): void {
+    if (data && typeof data === "object" && data.status !== "error" && data.summary) {
+      this.applySummary(data.summary);
+      return;
+    }
+    this.failSummary();
+  }
+
+  /**
+   * Fallback when a `summarize` round-trip fails. Finishes the flow with no
+   * summary, so the widget shows its ordinary completion screen. As with
+   * extraction, an LLM outage degrades the experience rather than breaking it.
+   */
+  failSummary(): void {
+    this._summary = null;
+    this._finished = true;
   }
 
   /**
