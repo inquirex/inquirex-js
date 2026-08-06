@@ -21,15 +21,18 @@ export interface ServerVerbConfig {
  * the result, advancing the engine exactly once. DOM-free and framework-free so
  * it can be unit-tested directly.
  *
- * The verb (`extract` today; `clarify` alias; `describe`/`summarize`/`detour`
+ * The verb (`extract`, its `clarify` alias, or `summarize`; `describe`/`detour`
  * later) is read from the engine's current step and sent both as a `?verb=`
  * query param — so the server can route without parsing the body — and in the
  * body as the source of truth. A single configurable `llmUrl` handles every
  * verb; there is no per-verb path.
  *
- * Every failure path degrades to {@link FlowEngine.failExtraction}: no endpoint
- * configured, non-2xx, timeout, network error, or malformed JSON. The flow never
- * breaks on an LLM failure — it advances and the questions are simply asked.
+ * Every failure path degrades: no endpoint configured, non-2xx, timeout,
+ * network error, or malformed JSON. `extract` falls back to
+ * {@link FlowEngine.failExtraction} and the questions are simply asked;
+ * `summarize` falls back to {@link FlowEngine.failSummary} and the widget
+ * shows its ordinary completion screen. The flow never breaks on an LLM
+ * failure.
  *
  * The request carries only data (verb, flow id, version, step id, answers-so-far)
  * plus the bearer token. It never sends a prompt, model, or schema — those are
@@ -39,11 +42,18 @@ export async function runServerVerb(
   engine: FlowEngine,
   cfg: ServerVerbConfig,
 ): Promise<void> {
-  if (!engine.currentStepIsExtract) return;
+  if (!engine.currentStepIsServerVerb) return;
+
+  // Which failure path this verb degrades to. `extract` advances and the
+  // questions get asked normally; `summarize` finishes with no summary, so
+  // the widget shows its ordinary completion screen. Neither ever blocks.
+  const isSummarize = engine.currentStepIsSummarize;
+  const degrade = () =>
+    isSummarize ? engine.failSummary() : engine.failExtraction();
 
   // No endpoint configured → immediate graceful fallback.
   if (!cfg.llmUrl) {
-    engine.failExtraction();
+    degrade();
     return;
   }
 
@@ -70,9 +80,14 @@ export async function runServerVerb(
       signal: controller.signal,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    engine.applyExtractResponse(await res.json());
+    const body = await res.json();
+    if (isSummarize) {
+      engine.applySummaryResponse(body);
+    } else {
+      engine.applyExtractResponse(body);
+    }
   } catch {
-    engine.failExtraction();
+    degrade();
   } finally {
     clearTimeout(timer);
   }
