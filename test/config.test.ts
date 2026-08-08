@@ -161,3 +161,26 @@ describe("hasFlowSource", () => {
     expect(hasFlowSource({ trigger: "auto" })).toBe(false);
   });
 });
+
+describe("mergeConfigs — theme values", () => {
+  it("keeps only non-empty string theme values", () => {
+    const cfg = mergeConfigs({
+      theme: {
+        brand: "#2563eb",
+        // A host writing JSON by hand can easily produce these; neither is a
+        // usable CSS value, and neither should reach setProperty.
+        radius: 8 as unknown as string,
+        surface: "",
+      },
+    });
+    expect(cfg.theme).toEqual({ brand: "#2563eb" });
+  });
+
+  it("fills a theme key an earlier source omitted", () => {
+    const cfg = mergeConfigs(
+      { theme: { brand: "#111111" } },
+      { theme: { brand: "#999999", surface: "#ffffff" } },
+    );
+    expect(cfg.theme).toEqual({ brand: "#111111", surface: "#ffffff" });
+  });
+});

@@ -1,0 +1,17 @@
+// The demo page and the test suite, type-checked but never emitted.
+//
+// They cannot live in the main tsconfig: that one sets `rootDir: "src"` and
+// emits declarations into dist/, and widening its `include` would drag demo
+// and test types into the published package.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "declarationDir": null,
+    "rootDir": ".",
+    "types": ["vite/client", "vitest/globals"]
+  },
+  "include": ["demo", "test", "vite.config.ts", "vitest.config.ts"]
+}

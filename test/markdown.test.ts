@@ -34,7 +34,9 @@ describe("renderMarkdown — the formatting a summary needs", () => {
   });
 
   it("renders emphasis and inline code", () => {
-    expect(html("**bold** and *italic* and `code`")).toContain("<strong>bold</strong>");
+    expect(html("**bold** and *italic* and `code`")).toContain(
+      "<strong>bold</strong>",
+    );
     expect(html("`code`")).toContain("<code>code</code>");
   });
 
@@ -80,7 +82,9 @@ describe("renderMarkdown — the allowlist", () => {
   });
 
   it("keeps mailto and relative links", () => {
-    expect(html("[mail](mailto:alan.turing@manchester.edu)")).toContain("mailto:");
+    expect(html("[mail](mailto:alan.turing@manchester.edu)")).toContain(
+      "mailto:",
+    );
     expect(html("[rel](/somewhere)")).toContain('href="/somewhere"');
   });
 
@@ -102,13 +106,13 @@ describe("renderMarkdown — the allowlist", () => {
     expect(out).not.toContain("evil");
   });
 
-  // No src attribute: happy-dom resolves an iframe's src while parsing,
-  // before the allowlist ever sees the element, which logs a navigation
-  // error even though the element is correctly removed. Dropping the tag is
-  // what matters, and an src-carrying embed is covered on the next case.
-  it("removes an iframe entirely", () => {
-    const out = html("<iframe></iframe>");
+  // Parsing happens inside a <template>, so the iframe is never connected to
+  // a browsing context and its src is never resolved — the allowlist sees the
+  // element before anything can navigate on its behalf.
+  it("removes an iframe entirely, src and all", () => {
+    const out = html('<iframe src="https://evil.test/frame"></iframe>');
     expect(out).not.toContain("<iframe");
+    expect(out).not.toContain("evil.test");
   });
 
   it("removes an embed and its source", () => {
@@ -128,5 +132,19 @@ describe("renderMarkdownToHtml", () => {
     const out = renderMarkdownToHtml("## Title\n\n<script>alert(1)</script>");
     expect(out).toContain("<h2>Title</h2>");
     expect(out).not.toContain("<script");
+  });
+});
+
+describe("renderMarkdown — non-element nodes", () => {
+  it("drops HTML comments, which markdown passes through verbatim", () => {
+    const out = html("Visible <!-- hidden note --> text");
+    expect(out).not.toContain("hidden note");
+    expect(out).toContain("Visible");
+    expect(out).toContain("text");
+  });
+
+  it("drops a comment used to smuggle markup past a naive regex scrubber", () => {
+    const out = html("<!--<script>alert(1)</script>-->");
+    expect(out).not.toContain("alert(1)");
   });
 });

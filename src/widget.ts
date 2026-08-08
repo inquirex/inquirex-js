@@ -35,6 +35,14 @@ const SEND_ICON = html`<svg width="18" height="18" viewBox="0 0 24 24" fill="non
 const CHECK_ICON = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 const BUG_ICON = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="6" width="8" height="14" rx="4"/><line x1="12" y1="6" x2="12" y2="4"/><line x1="9.5" y1="4" x2="14.5" y2="4"/><line x1="19" y1="8" x2="16" y2="10"/><line x1="5" y1="8" x2="8" y2="10"/><line x1="19" y1="18" x2="16" y2="16"/><line x1="5" y1="18" x2="8" y2="16"/><line x1="19" y1="13" x2="16" y2="13"/><line x1="5" y1="13" x2="8" y2="13"/></svg>`;
 
+/** How long the completion checkmark is left on screen before fading. */
+const AUTO_DISMISS_MS = 3500;
+
+/** Length of the fade itself. Kept slow on purpose: the widget is retiring,
+ *  not being closed, and a quick cut reads as a crash. Must stay in step with
+ *  the `:host(.iq-dismissing)` transition below. */
+const FADE_OUT_MS = 1200;
+
 @customElement("inquirex-widget")
 export class InquirexWidget extends LitElement {
   static styles = css`
@@ -164,6 +172,19 @@ export class InquirexWidget extends LitElement {
     @keyframes panelOut {
       from { opacity: 1; transform: scale(1) translateY(0); }
       to   { opacity: 0; transform: scale(0.92) translateY(12px); }
+    }
+
+    /* The retirement fade after a completed flow. Deliberately slower and
+       flatter than panelOut — that one is a dismissal the user asked for and
+       should feel instant; this one happens on its own and should read as the
+       widget bowing out. Duration tracks FADE_OUT_MS. */
+    :host(.iq-dismissing) {
+      opacity: 0;
+      transition: opacity 1.2s ease;
+      pointer-events: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      :host(.iq-dismissing) { transition: opacity 1ms linear; }
     }
 
     /* Mirror the panel (and dev inspector) when anchored bottom-left. */
@@ -637,6 +658,24 @@ export class InquirexWidget extends LitElement {
   @state() private debugOpen = false;
   @state() private highlightedJson = "";
 
+  /** True once the completion screen has faded out. Renders nothing at all —
+   *  launcher included, since the flow it launches is already finished. */
+  @state() private dismissed = false;
+
+  /** How long the completion checkmark stays before the widget fades away.
+   *  Set to 0 to keep the finished panel on screen indefinitely. */
+  @property({ type: Number, attribute: "auto-dismiss-ms" })
+  autoDismissMs = AUTO_DISMISS_MS;
+
+  /** Step id whose Continue button already took focus. */
+  private focusedContinueFor: string | null = null;
+
+  /** Pending "start fading" timer, and the fade-to-gone timer that follows.
+   *  Typed off the platform's own return so this compiles under both the DOM
+   *  and Node type definitions, which disagree about what a timer handle is. */
+  private dismissTimer: ReturnType<typeof setTimeout> | null = null;
+  private fadeTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** Bearer credential forwarded on every request. Resolves to the explicit
    *  `auth` token, else the flow definition's server-issued `session.token`. */
   private sessionToken = "";
@@ -658,6 +697,11 @@ export class InquirexWidget extends LitElement {
       return;
     }
     this.loadDefinition();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.clearDismissTimers();
   }
 
   /** Whether the current page origin is permitted to run this embed. */
@@ -718,6 +762,8 @@ export class InquirexWidget extends LitElement {
   render() {
     // Blocked origin → render nothing at all (no launcher, no panel).
     if (!this.originAllowed) return nothing;
+    // Finished, faded, gone. Same total removal as a blocked origin.
+    if (this.dismissed) return nothing;
     return html`
       ${this.open ? this.renderPanel() : nothing}
       <button
@@ -823,6 +869,73 @@ export class InquirexWidget extends LitElement {
     if (import.meta.env.DEV && this.debugOpen && changed.has("debugOpen")) {
       this.refreshHighlight();
     }
+    this.syncContinueFocus();
+    this.scheduleAutoDismiss();
+  }
+
+  /**
+   * Put keyboard focus on a display step's Continue button.
+   *
+   * A `say` / `header` / `btw` / `warning` step renders no input, so nothing in
+   * the panel holds focus and Enter has nothing to act on — the user has to
+   * reach for the mouse to get past a message. Focusing the button restores
+   * Enter (and Space) through the browser's native button activation rather
+   * than a key handler of our own, which also keeps the step reachable by
+   * screen reader and Tab.
+   *
+   * Guarded by step id so an unrelated re-render — a spinner tick, a debug
+   * refresh — cannot yank focus back after the user has Tabbed away.
+   */
+  private syncContinueFocus(): void {
+    const stepId = this.engine?.finished ? null : this.engine?.currentStepId;
+    if (!this.open || !stepId) {
+      this.focusedContinueFor = null;
+      return;
+    }
+    if (this.focusedContinueFor === stepId) return;
+
+    const btn = this.shadowRoot?.querySelector<HTMLButtonElement>(
+      "button[data-continue]",
+    );
+    if (!btn) {
+      // Not a display step — leave focus wherever the input control put it.
+      this.focusedContinueFor = null;
+      return;
+    }
+    this.focusedContinueFor = stepId;
+    btn.focus();
+  }
+
+  /**
+   * Once the completion checkmark is on screen, fade the whole widget away.
+   *
+   * The flow is over and the panel has nothing left to offer, so it retires
+   * itself instead of sitting there waiting to be dismissed by hand. The
+   * launcher goes with it — reopening would only replay a finished flow.
+   *
+   * A `summarize` flow is deliberately exempt: that closing screen carries the
+   * summary text plus Close and Print, and pulling it out from under someone
+   * mid-read would destroy the thing they were given.
+   */
+  private scheduleAutoDismiss(): void {
+    if (this.autoDismissMs <= 0 || this.dismissTimer !== null) return;
+    const engine = this.engine;
+    if (!engine?.finished || engine.summary) return;
+
+    this.dismissTimer = globalThis.setTimeout(() => {
+      this.classList.add("iq-dismissing");
+      this.fadeTimer = globalThis.setTimeout(() => {
+        this.dismissed = true;
+      }, FADE_OUT_MS);
+    }, this.autoDismissMs);
+  }
+
+  /** Stop pending dismiss/fade timers, so a detached widget cannot fire. */
+  private clearDismissTimers(): void {
+    if (this.dismissTimer !== null) globalThis.clearTimeout(this.dismissTimer);
+    if (this.fadeTimer !== null) globalThis.clearTimeout(this.fadeTimer);
+    this.dismissTimer = null;
+    this.fadeTimer = null;
   }
 
   private renderHistory(engine: FlowEngine) {
@@ -882,7 +995,7 @@ export class InquirexWidget extends LitElement {
       <div class="input-area">
         ${
           isDisplay
-            ? html`<button class="continue-btn" @click=${this.handleContinue}>Continue</button>`
+            ? html`<button class="continue-btn" data-continue @click=${this.handleContinue}>Continue</button>`
             : this.renderInputControl(step)
         }
       </div>
@@ -934,6 +1047,9 @@ export class InquirexWidget extends LitElement {
             <iq-number-input
               type=${type}
               .value=${step.default != null ? Number(step.default) : null}
+              .min=${step.min ?? null}
+              .max=${step.max ?? null}
+              .step=${step.step_size ?? null}
               @iq-submit=${this.handleSubmitInput}
               @iq-input=${() => {
                 this.inputValid = true;
@@ -1034,7 +1150,8 @@ export class InquirexWidget extends LitElement {
     if (!opened) {
       // A popup blocker refused the window. Say so — silently doing nothing
       // reads as a broken button.
-      this.error = "Your browser blocked the print window. Allow pop-ups for this site and try again.";
+      this.error =
+        "Your browser blocked the print window. Allow pop-ups for this site and try again.";
     }
   }
 

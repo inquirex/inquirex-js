@@ -40,6 +40,17 @@ format:
 check:
     bunx biome check --write .
 
+# Everything the CI `checks` job runs, in the same order (read-only)
+ci: typecheck lint coverage
+
+# The name every package in the family answers to, and the one
+# `inquirex versions-bump` invokes after rewriting a version. Deliberately not
+# an alias for `check`, which writes: a bump must be able to verify a package
+# without reformatting it. Without this the bump reported FAIL with "justfile
+# does not contain recipe `check-all`" — indistinguishable, in that report,
+# from a real test failure.
+alias check-all := ci
+
 # Build the IIFE + ESM bundles and type declarations
 build:
     bun run build
