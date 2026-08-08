@@ -169,7 +169,17 @@ export function printSummary(
   markdown: string,
   options: PrintSummaryOptions = {},
 ): Window | null {
-  const win = window.open("", "_blank", "noopener,noreferrer");
+  // No `noopener` here, deliberately. Per the HTML spec a window opened with
+  // it returns null — and this function's entire job is to write a document
+  // into the handle it gets back. Passing it produced the worst of both
+  // outcomes: a blank tab opened, the handle came back null, and the widget
+  // reported a popup blocker that had not blocked anything.
+  //
+  // Nothing is given away by omitting it. `noopener` protects against a
+  // *third-party destination* reading `window.opener`; the destination here is
+  // about:blank, populated with markup this module generates and the summary
+  // allowlist has already vetted. There is no other origin in the picture.
+  const win = window.open("", "_blank");
   if (!win) return null;
 
   const title = options.title ?? "Your summary";

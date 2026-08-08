@@ -1,6 +1,6 @@
 {
   "name": "inquirex-widget",
-  "version": "0.9.4",
+  "version": "0.9.6",
   "description": "Embeddable copilot-style questionnaire widget powered by Inquirex flow definitions",
   "type": "module",
   "main": "dist/inquirex.mjs",
@@ -33,7 +33,7 @@
     "build": "vite build && tsc",
     "prepublishOnly": "bun run build && bun run test",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.demo.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

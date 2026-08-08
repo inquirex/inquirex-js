@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { FlowEngine } from "../src/engine.js";
 import { runServerVerb } from "../src/server-verb.js";
 import type { FlowDefinition } from "../src/types.js";
+import { serverFetch } from "./helpers/fetch.js";
 
 /** A help-style flow that closes with a summarize step. */
 function helpFlow(): FlowDefinition {
@@ -118,13 +119,13 @@ describe("runServerVerb — the summarize round-trip", () => {
     const engine = atSummarize();
     let calledUrl = "";
     let body: Record<string, unknown> = {};
-    const fn = vi.fn(async (url: string, init: RequestInit) => {
+    const fn = serverFetch(async (url, init) => {
       calledUrl = url;
       body = JSON.parse(init.body as string);
       return {
         ok: true,
         json: async () => ({ status: "ok", summary: MARKDOWN }),
-      } as Response;
+      };
     });
 
     await runServerVerb(engine, { llmUrl: "https://x.test/llm", fetchFn: fn });

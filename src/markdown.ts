@@ -21,6 +21,7 @@ import { marked } from "marked";
  */
 
 /** Elements a summary may contain. Everything else is unwrapped to its text. */
+// biome-ignore format: grouped by role, so the shape of the allowlist is legible
 const ALLOWED_TAGS = new Set([
   "P", "BR", "HR",
   "H1", "H2", "H3", "H4", "H5", "H6",
@@ -54,16 +55,21 @@ const LANGUAGE_CLASS = /^language-[\w+-]+$/;
  */
 export function renderMarkdown(source: string): DocumentFragment {
   const html = marked.parse(source ?? "", { async: false, gfm: true });
-  const doc = new DOMParser().parseFromString(
-    `<div id="iq-root">${html}</div>`,
-    "text/html",
-  );
-  const root = doc.getElementById("iq-root");
-  const fragment = document.createDocumentFragment();
-  if (!root) return fragment;
 
-  sanitizeChildren(root);
-  for (const node of Array.from(root.childNodes)) {
+  // Parse into a <template>, whose content belongs to an inert "template
+  // contents owner" document. Nothing inside it is connected to a browsing
+  // context, so an injected <iframe src> or <img src> is built as a node and
+  // never fetched — the markup is inspected before anything can act on it.
+  // A DOMParser document would do the same in a browser, but happy-dom
+  // eagerly navigates iframes it parses, which is a real difference in when
+  // hostile markup gets a chance to run.
+  const template = document.createElement("template");
+  template.innerHTML = html;
+
+  sanitizeChildren(template.content);
+
+  const fragment = document.createDocumentFragment();
+  for (const node of Array.from(template.content.childNodes)) {
     fragment.appendChild(document.importNode(node, true));
   }
   return fragment;
@@ -77,7 +83,7 @@ export function renderMarkdown(source: string): DocumentFragment {
  * instead of vanishing. A `<script>` unwraps to its source as visible,
  * inert text — which is the loud failure, not a silent one.
  */
-function sanitizeChildren(parent: Element): void {
+function sanitizeChildren(parent: Element | DocumentFragment): void {
   for (const child of Array.from(parent.childNodes)) {
     if (child.nodeType === Node.TEXT_NODE) continue;
 

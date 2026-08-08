@@ -92,6 +92,22 @@ export interface StepDefinition {
   thinking_label?: string;
   /** Map of accumulator name -> contribution shape. */
   accumulate?: Record<string, AccumulationShape>;
+
+  /** Inclusive lower bound for `integer` / `decimal` / `currency` steps.
+   *  Ignored by every other type. */
+  min?: number;
+
+  /** Inclusive upper bound for `integer` / `decimal` / `currency` steps.
+   *  Ignored by every other type. */
+  max?: number;
+
+  /** Stepper increment for numeric steps. Defaults to 1 for `integer` and
+   *  0.01 for `decimal` / `currency`.
+   *
+   *  Named `step_size` rather than `step` because a step *is* the unit of a
+   *  flow — `steps.headcount.step` would read as a nested flow step rather
+   *  than a numeric increment. */
+  step_size?: number;
 }
 
 /** Visual theme overrides. Each field maps 1:1 to a CSS custom property

@@ -325,7 +325,12 @@ export class FlowEngine {
    * user from finishing.
    */
   applySummaryResponse(data: SummaryResponse | null | undefined): void {
-    if (data && typeof data === "object" && data.status !== "error" && data.summary) {
+    if (
+      data &&
+      typeof data === "object" &&
+      data.status !== "error" &&
+      data.summary
+    ) {
       this.applySummary(data.summary);
       return;
     }

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { FlowEngine, evaluateRule } from "../src/engine.js";
+import {
+  FlowEngine,
+  accumulationContribution,
+  evaluateRule,
+} from "../src/engine.js";
 import type { FlowDefinition, RuleDefinition } from "../src/types.js";
 
 const flow = (overrides: Partial<FlowDefinition> = {}): FlowDefinition => ({
@@ -286,5 +290,88 @@ describe("FlowEngine", () => {
   it("totalSteps returns the count of steps", () => {
     const engine = new FlowEngine(flow());
     expect(engine.totalSteps).toBe(3);
+  });
+});
+
+// The remaining edges: malformed definitions and shapes the flow author can
+// write but the happy path never reaches.
+describe("FlowEngine — degenerate definitions", () => {
+  it("finishes immediately when `start` names a step that does not exist", () => {
+    const engine = new FlowEngine({
+      id: "broken",
+      version: "1.0.0",
+      start: "nowhere",
+      steps: {},
+    });
+    expect(engine.finished).toBe(true);
+  });
+
+  it("finishes when a skipped step transitions to a step that does not exist", () => {
+    const engine = new FlowEngine({
+      id: "broken",
+      version: "1.0.0",
+      start: "skipped",
+      steps: {
+        skipped: {
+          verb: "ask",
+          type: "string",
+          question: "Never asked",
+          skip_if: { op: "not_empty", field: "anything" },
+          transitions: [{ to: "missing" }],
+        },
+      },
+      // The skip rule reads an answer that is pre-supplied below.
+    });
+    expect(engine.finished).toBe(false);
+
+    const skipping = new FlowEngine({
+      id: "broken",
+      version: "1.0.0",
+      start: "gate",
+      steps: {
+        gate: {
+          verb: "say",
+          text: "hi",
+          transitions: [{ to: "skipped" }],
+        },
+        skipped: {
+          verb: "ask",
+          type: "string",
+          question: "Never asked",
+          skip_if: { op: "equals", field: "gate", value: undefined },
+          transitions: [{ to: "missing" }],
+        },
+      },
+    });
+    skipping.acknowledge();
+    expect(skipping.finished).toBe(true);
+  });
+
+  it("reports whether the current step demands a server round-trip", () => {
+    const engine = new FlowEngine({
+      id: "t",
+      version: "1.0.0",
+      start: "a",
+      steps: {
+        a: {
+          verb: "ask",
+          type: "string",
+          question: "A?",
+          requires_server: true,
+        },
+      },
+    });
+    expect(engine.currentStepRequiresServer).toBe(true);
+
+    const plain = new FlowEngine(flow());
+    expect(plain.currentStepRequiresServer).toBe(false);
+  });
+});
+
+describe("accumulationContribution — unrecognized shapes", () => {
+  it("contributes nothing for a shape it does not understand", () => {
+    // A flow written against a newer DSL than this widget knows about must
+    // not corrupt the running total.
+    expect(accumulationContribution({ mystery: 5 } as never, 10)).toBe(0);
   });
 });

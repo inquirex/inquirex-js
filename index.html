@@ -130,12 +130,22 @@
        Uncomment trigger/position/theme below to preview those knobs. -->
   <script type="module">
     import { mount } from './src/index.ts';
-    mount({
-      url: '/demo/tax-intake-default.json',
-      // trigger: 'delay', triggerDelay: 1000,
-      // position: 'bottom-left',
-      // theme: { headerBg: '#111827', highlight: '#f59e0b', radius: '0', launcherBg: '#111827' },
-    });
+    import { installSwitcher } from './demo/switcher.ts';
+
+    // The picker in the bottom-left corner lists every definition in demo/ and
+    // reloads the page on change, so each flow is exercised through the same
+    // fetch-and-mount path a real embed uses. It reports which flow the URL
+    // asked for; mounting stays here, the one place the embed is configured.
+    const { selected } = installSwitcher();
+
+    if (selected) {
+      mount({
+        url: selected.path,
+        // trigger: 'delay', triggerDelay: 1000,
+        // position: 'bottom-left',
+        // theme: { headerBg: '#111827', highlight: '#f59e0b', radius: '0', launcherBg: '#111827' },
+      });
+    }
   </script>
 </body>
 </html>
